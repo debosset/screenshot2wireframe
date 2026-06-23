@@ -1,8 +1,9 @@
 import uuid, shutil
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import Optional
 
 from .opencv_analyzer import analyze_screenshot
 from .balsamiq_json import to_clipboard_json
@@ -19,7 +20,10 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/convert")
-async def convert(file: UploadFile = File(...)):
+async def convert(
+    file: UploadFile = File(...),
+    project_id: Optional[str] = Form("0:1"),
+):
     if file.content_type not in {"image/png","image/jpeg","image/webp","image/gif"}:
         raise HTTPException(400, "Format non supporté.")
     job_id = str(uuid.uuid4())
@@ -31,7 +35,7 @@ async def convert(file: UploadFile = File(...)):
         components = analyze_screenshot(str(up))
         if not components:
             raise HTTPException(422, "Aucun composant détecté.")
-        clipboard = to_clipboard_json(components)
+        clipboard = to_clipboard_json(components, project_id=project_id or "0:1")
         return {
             "components_count": len(components),
             "clipboard_json": clipboard,

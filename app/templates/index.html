@@ -13,6 +13,14 @@
     .brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .tagline{font-size:.9rem;color:#888}
     .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:580px;box-shadow:0 2px 24px rgba(0,0,0,0.07)}
+
+    /* Project ID field */
+    .pid-row{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}
+    .pid-row label{font-size:.8rem;color:#888;font-weight:500}
+    .pid-row input{padding:9px 12px;border:1px solid #d0cfc8;border-radius:8px;font-size:.85rem;color:#333;background:#fafaf7;outline:none;transition:border-color .2s}
+    .pid-row input:focus{border-color:#667eea}
+    .pid-hint{font-size:.75rem;color:#bbb}
+
     #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
     #dropzone.on{border-color:#667eea;background:#f0f0ff}
     #dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
@@ -72,6 +80,13 @@
   </div>
 
   <div class="card">
+    <!-- Project ID -->
+    <div class="pid-row">
+      <label for="pid">Project ID Balsamiq <span style="font-weight:400;color:#bbb">(optionnel)</span></label>
+      <input type="text" id="pid" placeholder="ex: 2178941824:2178942175" spellcheck="false">
+      <span class="pid-hint">Visible dans l'URL de votre projet Balsamiq — permet de coller directement dans le bon projet</span>
+    </div>
+
     <div id="dropzone">
       <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp">
       <div class="drop-icon">🖼️</div>
@@ -113,7 +128,8 @@
     btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),
     pbar=document.getElementById('pbar'),stat=document.getElementById('status'),
     res=document.getElementById('result'),err=document.getElementById('error'),
-    cpBtn=document.getElementById('copy-btn'),clrBtn=document.getElementById('clear-btn');
+    cpBtn=document.getElementById('copy-btn'),clrBtn=document.getElementById('clear-btn'),
+    pidInput=document.getElementById('pid');
     let file=null,clipJson=null;
 
     fi.onchange=e=>load(e.target.files[0]);
@@ -146,7 +162,9 @@
       let si=0;
       const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},500);
       try{
-        const fd=new FormData();fd.append('file',file);
+        const fd=new FormData();
+        fd.append('file',file);
+        fd.append('project_id', pidInput.value.trim() || '0:1');
         const r=await fetch('/convert',{method:'POST',body:fd});
         const d=await r.json();
         clearInterval(t);
