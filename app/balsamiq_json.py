@@ -8,32 +8,17 @@ import uuid
 from typing import Any, Dict, List
 
 BALSAMIQ_COMPONENTS = {
+    # Types validés / très sûrs pour le clipboard Balsamiq text/plain.
+    # Important : éviter NavBar, Rectangle, SearchBox, DataGrid, etc. car selon
+    # la version Balsamiq ils sont refusés au collage.
     "Button": (61, 27),
-    "ButtonBar": (159, 27),
     "RadioButton": (97, 23),
     "CheckBox": (78, 23),
-    "Toggle": (54, 23),
-    "Link": (60, 17),
     "TextInput": (79, 27),
-    "TextArea": (200, 100),
-    "ComboBox": (120, 27),
-    "DatePicker": (120, 27),
-    "SearchBox": (200, 27),
-    "NavBar": (300, 30),
-    "TabBar": (300, 42),
-    "BreadCrumb": (250, 20),
     "Label": (100, 17),
-    "Title": (200, 30),
-    "Paragraph": (300, 80),
-    "Image": (200, 150),
-    "Icon": (32, 32),
-    "Table": (300, 120),
-    "DataGrid": (300, 150),
-    "Rectangle": (200, 150),
-    "RoundedRectangle": (200, 150),
-    "FieldSet": (300, 200),
-    "HRule": (200, 5),
 }
+
+SAFE_TYPEIDS = set(BALSAMIQ_COMPONENTS.keys())
 
 
 def _short_type(opencv_type: str) -> str:
@@ -49,42 +34,39 @@ def _short_type(opencv_type: str) -> str:
 
 
 def classify(opencv_type: str, x: int, y: int, w: int, h: int, img_w: int = 1000, img_h: int = 800) -> str:
-    """Retourne un typeID court compatible avec le clipboard Balsamiq."""
+    """
+    Retourne uniquement des typeID validés au collage Balsamiq.
+
+    Le test utilisateur a confirmé que le JSON text/plain fonctionne avec CheckBox.
+    Le collage échouait ensuite avec des typeID plus risqués comme NavBar/Rectangle.
+    On force donc une palette sûre : CheckBox, RadioButton, TextInput, Button, Label.
+    """
     existing = _short_type(opencv_type)
-    if existing in BALSAMIQ_COMPONENTS:
+    if existing in SAFE_TYPEIDS:
         return existing
 
     ratio = w / h if h > 0 else 1
     area = w * h
-    rel_y = y / img_h if img_h else 0
 
-    if rel_y < 0.10 and w > img_w * 0.6 and h < 60:
-        return "NavBar"
-    if rel_y < 0.20 and w > img_w * 0.5 and 30 <= h <= 55:
-        return "TabBar"
-    if w > img_w * 0.4 and h < 35 and ratio > 8:
-        return "Title"
-    if ratio > 20 and h <= 5:
-        return "HRule"
-    if 4.0 <= ratio <= 14.0 and 20 <= h <= 38:
-        return "SearchBox" if w > 250 else "TextInput"
-    if 0.8 <= ratio <= 3.5 and 60 <= h <= 200 and 150 <= w <= 500:
-        return "TextArea"
-    if 1.5 <= ratio <= 5.0 and 20 <= h <= 42 and w <= 220:
-        return "Button"
-    if 0.6 <= ratio <= 1.8 and area < 2500 and w < 90:
+    # Petit carré : case à cocher
+    if 0.65 <= ratio <= 1.45 and area < 2600 and w <= 90 and h <= 90:
         return "CheckBox"
-    if 3.0 <= ratio <= 8.0 and 20 <= h <= 35 and 80 <= w <= 220:
-        return "ComboBox"
-    if 0.5 <= ratio <= 2.5 and area > 15000:
-        return "Image"
-    if ratio > 2.0 and h > 80 and w > 200:
-        return "DataGrid"
-    if area > 30000:
-        return "FieldSet"
-    if ratio > 5.0 and h < 25:
+
+    # Texte / libellé très plat
+    if ratio >= 5.0 and h <= 22:
         return "Label"
-    return "Rectangle"
+
+    # Champ de saisie large et peu haut
+    if ratio >= 3.2 and 18 <= h <= 45:
+        return "TextInput"
+
+    # Bouton classique
+    if 1.4 <= ratio <= 6.5 and 18 <= h <= 48 and w <= 260:
+        return "Button"
+
+    # Fallback volontairement sûr : Button accepte bien w/h personnalisés.
+    # C'est moins joli qu'un rectangle, mais ça colle dans Balsamiq.
+    return "Button"
 
 
 def to_clipboard_json(components: List[Dict[str, Any]], project_id: str = "0:1") -> str:
@@ -109,7 +91,9 @@ def to_clipboard_json(components: List[Dict[str, Any]], project_id: str = "0:1")
             int(comp["x"]), int(comp["y"]), int(comp["w"]), int(comp["h"]),
             max_x or 1000, max_y or 800,
         )
-        measured_w, measured_h = BALSAMIQ_COMPONENTS.get(type_id, (int(comp["w"]), int(comp["h"])))
+        if type_id not in SAFE_TYPEIDS:
+            type_id = classify(type_id, int(comp["x"]), int(comp["y"]), int(comp["w"]), int(comp["h"]), max_x or 1000, max_y or 800)
+        measured_w, measured_h = BALSAMIQ_COMPONENTS[type_id]
         w = int(comp["w"])
         h = int(comp["h"])
 
