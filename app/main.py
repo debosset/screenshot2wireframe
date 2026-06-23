@@ -2,20 +2,17 @@ import os
 import uuid
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 import shutil
 
 from .opencv_analyzer import analyze_screenshot
-from .bmpr_builder import build_bmpr
+from .balsamiq_json import to_clipboard_json
 
 BASE_DIR = Path(__file__).parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "outputs"
 UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Screenshot to Wireframe")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -44,37 +41,13 @@ async def convert(file: UploadFile = File(...)):
         if not components:
             raise HTTPException(422, "Aucun composant détecté dans l'image.")
 
-        output_path = OUTPUT_DIR / f"{job_id}.bmpr"
-        build_bmpr(components, str(output_path), project_name=Path(file.filename).stem)
+        clipboard_json = to_clipboard_json(components)
 
         return {
-            "job_id": job_id,
             "components_count": len(components),
-            "download_url": f"/download/{job_id}",
-            "components": components[:5],
+            "clipboard_json": clipboard_json,
+            "types": list(set(c["type"].split("::")[-1] for c in components)),
         }
     finally:
         if upload_path.exists():
             upload_path.unlink()
-
-
-@app.get("/download/{job_id}")
-async def download(job_id: str):
-    safe_id = job_id.replace("..", "").replace("/", "")
-    output_path = OUTPUT_DIR / f"{safe_id}.bmpr"
-    if not output_path.exists():
-        raise HTTPException(404, "Fichier introuvable ou expiré.")
-    return FileResponse(
-        path=str(output_path),
-        media_type="application/octet-stream",
-        filename=f"wireframe_{safe_id[:8]}.bmpr",
-    )
-
-
-@app.delete("/cleanup/{job_id}")
-async def cleanup(job_id: str):
-    safe_id = job_id.replace("..", "").replace("/", "")
-    f = OUTPUT_DIR / f"{safe_id}.bmpr"
-    if f.exists():
-        f.unlink()
-    return {"deleted": True}

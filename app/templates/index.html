@@ -17,7 +17,7 @@
       padding: 40px 16px;
     }
     h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 6px; }
-    .subtitle { color: #666; margin-bottom: 40px; font-size: 0.95rem; }
+    .subtitle { color: #666; margin-bottom: 32px; font-size: 0.95rem; text-align: center; }
 
     .card {
       background: #fff;
@@ -25,34 +25,59 @@
       border: 1px solid #e0e0e0;
       padding: 32px;
       width: 100%;
-      max-width: 560px;
+      max-width: 600px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
 
-    /* Drop zone */
+    /* Zone de drop / paste */
     #dropzone {
       border: 2px dashed #ccc;
       border-radius: 12px;
-      padding: 48px 24px;
+      padding: 40px 24px;
       text-align: center;
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
       position: relative;
     }
-    #dropzone.dragover { border-color: #5c6bc0; background: #f0f0ff; }
+    #dropzone.dragover, #dropzone.pasteover { border-color: #3f51b5; background: #f0f0ff; }
     #dropzone input[type=file] {
       position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
     }
-    #dropzone .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    #dropzone p { color: #555; font-size: 0.9rem; }
+    .drop-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    #dropzone p { color: #555; font-size: 0.9rem; margin: 4px 0; }
     #dropzone strong { color: #1a1a1a; }
-
-    #preview-wrap { margin-top: 16px; display: none; }
-    #preview-wrap img {
-      width: 100%; border-radius: 8px; border: 1px solid #e0e0e0;
-      max-height: 240px; object-fit: contain; background: #fafafa;
+    .hint {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .hint span {
+      background: #f0f0f0;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #444;
     }
 
-    button#convert-btn {
+    #preview-wrap { margin-top: 16px; display: none; position: relative; }
+    #preview-wrap img {
+      width: 100%; border-radius: 8px; border: 1px solid #e0e0e0;
+      max-height: 260px; object-fit: contain; background: #fafafa;
+      display: block;
+    }
+    #clear-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,0.5); color: #fff;
+      border: none; border-radius: 50%; width: 28px; height: 28px;
+      cursor: pointer; font-size: 16px; line-height: 28px; text-align: center;
+    }
+
+    #convert-btn {
       margin-top: 20px;
       width: 100%;
       padding: 14px;
@@ -65,82 +90,81 @@
       cursor: pointer;
       transition: background 0.2s, opacity 0.2s;
     }
-    button#convert-btn:hover:not(:disabled) { background: #303f9f; }
-    button#convert-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #convert-btn:hover:not(:disabled) { background: #303f9f; }
+    #convert-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    /* Progress */
     #progress { display: none; margin-top: 20px; }
-    .progress-bar-wrap {
-      height: 6px; background: #eee; border-radius: 3px; overflow: hidden;
-    }
-    .progress-bar {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg, #3f51b5, #7986cb);
-      border-radius: 3px;
-      transition: width 0.4s ease;
-    }
-    #status-text { font-size: 0.85rem; color: #666; margin-top: 8px; }
+    .progress-bar-wrap { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+    .progress-bar { height: 100%; width: 0%; background: #3f51b5; border-radius: 3px; transition: width 0.4s ease; }
+    #status-text { font-size: 0.85rem; color: #666; margin-top: 8px; text-align: center; }
 
-    /* Result */
+    #error {
+      display: none; margin-top: 16px; padding: 12px 16px;
+      background: #fff3f3; border: 1px solid #ffcdd2;
+      border-radius: 8px; color: #c62828; font-size: 0.88rem;
+    }
+
     #result { display: none; margin-top: 24px; }
     .result-box {
-      background: #f0f4ff;
-      border: 1px solid #c5cae9;
-      border-radius: 10px;
-      padding: 20px;
+      background: #f0f4ff; border: 1px solid #c5cae9;
+      border-radius: 12px; padding: 20px;
     }
     .result-box h3 { font-size: 1rem; color: #1a237e; margin-bottom: 4px; }
-    .result-box p { font-size: 0.85rem; color: #555; margin-bottom: 16px; }
-    .result-box a {
-      display: inline-block;
-      padding: 10px 20px;
-      background: #3f51b5;
-      color: #fff;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.9rem;
+    .result-info { font-size: 0.85rem; color: #555; margin-bottom: 16px; }
+
+    .steps {
+      background: #fff; border-radius: 8px;
+      border: 1px solid #c5cae9;
+      padding: 14px 16px; margin-bottom: 16px;
+      font-size: 0.85rem; color: #333; line-height: 2;
     }
-    .result-box a:hover { background: #303f9f; }
-    .tag-list { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
-    .tag {
-      background: #e8eaf6;
-      color: #3949ab;
-      border-radius: 6px;
-      padding: 3px 10px;
-      font-size: 0.78rem;
+    .steps ol { padding-left: 18px; }
+    .steps li { margin-bottom: 2px; }
+    .steps kbd {
+      background: #e8eaf6; border: 1px solid #9fa8da;
+      border-radius: 4px; padding: 1px 6px;
+      font-family: monospace; font-size: 0.82rem; color: #283593;
     }
 
-    /* Error */
-    #error {
-      display: none;
-      margin-top: 16px;
-      padding: 12px 16px;
-      background: #fff3f3;
-      border: 1px solid #ffcdd2;
-      border-radius: 8px;
-      color: #c62828;
-      font-size: 0.88rem;
+    #copy-btn {
+      width: 100%; padding: 13px;
+      background: #1a237e; color: #fff;
+      border: none; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #copy-btn:hover { background: #283593; }
+    #copy-btn.copied { background: #2e7d32; }
+
+    .tag-list { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      background: #e8eaf6; color: #3949ab;
+      border-radius: 6px; padding: 3px 10px; font-size: 0.78rem;
     }
   </style>
 </head>
 <body>
   <h1>Screenshot → Wireframe</h1>
-  <p class="subtitle">Convertissez n'importe quel screenshot en fichier Balsamiq .bmpr</p>
+  <p class="subtitle">Collez un screenshot ou importez une image → copiez le JSON → collez dans Balsamiq</p>
 
   <div class="card">
     <div id="dropzone">
       <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp">
-      <div class="icon">🖼️</div>
-      <p><strong>Glissez votre screenshot ici</strong></p>
-      <p>ou cliquez pour parcourir — PNG, JPG, WEBP</p>
+      <div class="drop-icon">🖼️</div>
+      <p><strong>Glissez, collez ou cliquez pour importer</strong></p>
+      <div class="hint">
+        <span>Ctrl+V</span> pour coller un screenshot
+        <span>ou parcourir</span>
+      </div>
     </div>
 
     <div id="preview-wrap">
       <img id="preview" src="" alt="Aperçu">
+      <button id="clear-btn" title="Effacer">×</button>
     </div>
 
-    <button id="convert-btn" disabled>Convertir en wireframe</button>
+    <button id="convert-btn" disabled>Analyser et générer le JSON Balsamiq</button>
 
     <div id="progress">
       <div class="progress-bar-wrap"><div class="progress-bar" id="pbar"></div></div>
@@ -151,46 +175,93 @@
 
     <div id="result">
       <div class="result-box">
-        <h3>Wireframe généré !</h3>
-        <p id="result-info"></p>
-        <a id="download-link" href="#">Télécharger le fichier .bmpr</a>
+        <h3>JSON généré !</h3>
+        <p class="result-info" id="result-info"></p>
+        <div class="steps">
+          <ol>
+            <li>Cliquez <strong>Copier le JSON</strong> ci-dessous</li>
+            <li>Ouvrez Balsamiq et votre mockup</li>
+            <li>Faites <kbd>Ctrl+V</kbd> (ou <kbd>⌘V</kbd> sur Mac)</li>
+            <li>Les composants apparaissent directement ✓</li>
+          </ol>
+        </div>
+        <button id="copy-btn">📋 Copier le JSON Balsamiq</button>
         <div class="tag-list" id="tag-list"></div>
       </div>
     </div>
   </div>
 
   <script>
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('file-input');
-    const preview = document.getElementById('preview');
-    const previewWrap = document.getElementById('preview-wrap');
+    const dropzone   = document.getElementById('dropzone');
+    const fileInput  = document.getElementById('file-input');
+    const preview    = document.getElementById('preview');
+    const previewWrap= document.getElementById('preview-wrap');
     const convertBtn = document.getElementById('convert-btn');
-    const progress = document.getElementById('progress');
-    const pbar = document.getElementById('pbar');
+    const progress   = document.getElementById('progress');
+    const pbar       = document.getElementById('pbar');
     const statusText = document.getElementById('status-text');
-    const result = document.getElementById('result');
-    const errorDiv = document.getElementById('error');
-    let selectedFile = null;
+    const result     = document.getElementById('result');
+    const errorDiv   = document.getElementById('error');
+    const copyBtn    = document.getElementById('copy-btn');
+    const clearBtn   = document.getElementById('clear-btn');
 
+    let selectedFile = null;
+    let clipboardJson = null;
+
+    // ── Chargement fichier ──────────────────────────────────────────────────
     fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
     dropzone.addEventListener('drop', e => {
       e.preventDefault(); dropzone.classList.remove('dragover');
-      loadFile(e.dataTransfer.files[0]);
+      const f = e.dataTransfer.files[0];
+      if (f) loadFile(f);
+    });
+
+    // ── Coller depuis le presse-papier (Ctrl+V) ────────────────────────────
+    document.addEventListener('paste', async e => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) { loadFile(file); break; }
+        }
+      }
+    });
+
+    // Indicateur visuel quand on colle
+    dropzone.addEventListener('focus', () => {});
+    window.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        dropzone.classList.add('pasteover');
+        setTimeout(() => dropzone.classList.remove('pasteover'), 600);
+      }
     });
 
     function loadFile(file) {
-      if (!file) return;
+      if (!file || !file.type.startsWith('image/')) return;
       selectedFile = file;
-      const url = URL.createObjectURL(file);
-      preview.src = url;
+      preview.src = URL.createObjectURL(file);
       previewWrap.style.display = 'block';
       convertBtn.disabled = false;
       result.style.display = 'none';
       errorDiv.style.display = 'none';
+      clipboardJson = null;
     }
 
+    clearBtn.addEventListener('click', () => {
+      selectedFile = null; clipboardJson = null;
+      preview.src = '';
+      previewWrap.style.display = 'none';
+      convertBtn.disabled = true;
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+      fileInput.value = '';
+    });
+
+    // ── Conversion ──────────────────────────────────────────────────────────
     convertBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
       convertBtn.disabled = true;
@@ -198,23 +269,20 @@
       result.style.display = 'none';
       progress.style.display = 'block';
 
-      // Fake progress pendant l'analyse
-      let pct = 0;
       const steps = [
         [20, 'Chargement de l\'image…'],
-        [45, 'Détection des contours…'],
-        [70, 'Classification des composants…'],
-        [90, 'Génération du fichier .bmpr…'],
+        [50, 'Détection des contours…'],
+        [75, 'Classification des composants…'],
+        [90, 'Génération du JSON Balsamiq…'],
       ];
       let si = 0;
       const tick = setInterval(() => {
         if (si < steps.length) {
-          pct = steps[si][0];
+          pbar.style.width = steps[si][0] + '%';
           statusText.textContent = steps[si][1];
-          pbar.style.width = pct + '%';
           si++;
         }
-      }, 600);
+      }, 500);
 
       try {
         const fd = new FormData();
@@ -222,28 +290,23 @@
         const res = await fetch('/convert', { method: 'POST', body: fd });
         const data = await res.json();
         clearInterval(tick);
+        if (!res.ok) throw new Error(data.detail || 'Erreur serveur');
 
-        if (!res.ok) {
-          throw new Error(data.detail || 'Erreur serveur');
-        }
-
+        clipboardJson = data.clipboard_json;
         pbar.style.width = '100%';
         statusText.textContent = 'Terminé !';
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 300));
         progress.style.display = 'none';
 
         document.getElementById('result-info').textContent =
-          `${data.components_count} composants détectés et exportés.`;
-        document.getElementById('download-link').href = data.download_url;
+          `${data.components_count} composants détectés.`;
 
         const tagList = document.getElementById('tag-list');
         tagList.innerHTML = '';
-        const types = [...new Set((data.components || []).map(c => c.type.split('::')[1]))];
-        types.forEach(t => {
-          const span = document.createElement('span');
-          span.className = 'tag';
-          span.textContent = t;
-          tagList.appendChild(span);
+        (data.types || []).forEach(t => {
+          const s = document.createElement('span');
+          s.className = 'tag'; s.textContent = t;
+          tagList.appendChild(s);
         });
 
         result.style.display = 'block';
@@ -254,6 +317,33 @@
         errorDiv.style.display = 'block';
       } finally {
         convertBtn.disabled = false;
+      }
+    });
+
+    // ── Copier JSON ─────────────────────────────────────────────────────────
+    copyBtn.addEventListener('click', async () => {
+      if (!clipboardJson) return;
+      try {
+        await navigator.clipboard.writeText(clipboardJson);
+        copyBtn.textContent = '✓ Copié ! Collez dans Balsamiq avec Ctrl+V';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = '📋 Copier le JSON Balsamiq';
+          copyBtn.classList.remove('copied');
+        }, 3000);
+      } catch(e) {
+        // Fallback si clipboard API bloquée
+        const ta = document.createElement('textarea');
+        ta.value = clipboardJson;
+        document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        copyBtn.textContent = '✓ Copié !';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = '📋 Copier le JSON Balsamiq';
+          copyBtn.classList.remove('copied');
+        }, 3000);
       }
     });
   </script>
