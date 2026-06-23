@@ -1,19 +1,24 @@
 """
 Génère le JSON format presse-papier Balsamiq.
-Dans Balsamiq : Edit > Paste (Ctrl+V) colle directement les composants.
+Format : BMLF + zlib(JSON) encodé base64
+C'est le format natif utilisé par Balsamiq quand on copie-colle des composants.
 """
 import json
+import zlib
+import base64
 from typing import List, Dict, Any
 
+
 TYPE_MAP = {
-    "com.balsamiq.mockups::Button": "com.balsamiq.mockups::Button",
-    "com.balsamiq.mockups::TextInput": "com.balsamiq.mockups::TextInput",
-    "com.balsamiq.mockups::Label": "com.balsamiq.mockups::Label",
-    "com.balsamiq.mockups::CheckBox": "com.balsamiq.mockups::CheckBox",
-    "com.balsamiq.mockups::Image": "com.balsamiq.mockups::Image",
+    "com.balsamiq.mockups::Button":        "com.balsamiq.mockups::Button",
+    "com.balsamiq.mockups::TextInput":     "com.balsamiq.mockups::TextInput",
+    "com.balsamiq.mockups::Label":         "com.balsamiq.mockups::Label",
+    "com.balsamiq.mockups::CheckBox":      "com.balsamiq.mockups::CheckBox",
+    "com.balsamiq.mockups::Image":         "com.balsamiq.mockups::Image",
     "com.balsamiq.mockups::NavigationBar": "com.balsamiq.mockups::NavBar",
-    "com.balsamiq.mockups::Rectangle": "com.balsamiq.mockups::Rectangle",
+    "com.balsamiq.mockups::Rectangle":     "com.balsamiq.mockups::Rectangle",
 }
+
 
 def _make_control(comp: Dict[str, Any], index: int) -> Dict[str, Any]:
     type_id = TYPE_MAP.get(comp["type"], "com.balsamiq.mockups::Rectangle")
@@ -38,17 +43,23 @@ def _make_control(comp: Dict[str, Any], index: int) -> Dict[str, Any]:
         "properties": properties,
     }
 
+
 def to_clipboard_json(components: List[Dict[str, Any]]) -> str:
     """
-    Format exact attendu par Balsamiq pour le collage presse-papier.
-    Source : https://support.balsamiq.com/resources/mockupjson/
+    Retourne le JSON lisible (pour affichage/debug dans l'UI).
     """
     controls = [_make_control(c, i) for i, c in enumerate(components)]
-    payload = {
-        "controls": controls,
-        "controlsVersion": "1.0",
-        "metadata": {
-            "clipboardVersion": "1.0"
-        }
-    }
-    return json.dumps(payload, indent=2)
+    return json.dumps({"controls": controls}, indent=2)
+
+
+def to_clipboard_bmlf(components: List[Dict[str, Any]]) -> str:
+    """
+    Retourne la chaîne BMLF prête à coller dans Balsamiq (Ctrl+V).
+    Format : 'BMLF' + base64(zlib(JSON))
+    """
+    controls = [_make_control(c, i) for i, c in enumerate(components)]
+    payload = {"controls": controls}
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    compressed = zlib.compress(raw, level=9)
+    b64 = base64.b64encode(compressed).decode("ascii")
+    return "BMLF" + b64

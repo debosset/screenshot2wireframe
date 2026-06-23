@@ -8,13 +8,13 @@ from fastapi import Request
 import shutil
 
 from .opencv_analyzer import analyze_screenshot
-from .balsamiq_json import to_clipboard_json
+from .balsamiq_json import to_clipboard_bmlf, to_clipboard_json
 
 BASE_DIR = Path(__file__).parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Screenshot to Wireframe")
+app = FastAPI(title="SnapWire")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
@@ -41,11 +41,10 @@ async def convert(file: UploadFile = File(...)):
         if not components:
             raise HTTPException(422, "Aucun composant détecté dans l'image.")
 
-        clipboard_json = to_clipboard_json(components)
-
         return {
             "components_count": len(components),
-            "clipboard_json": clipboard_json,
+            "clipboard_bmlf": to_clipboard_bmlf(components),
+            "clipboard_json": to_clipboard_json(components),
             "types": list(set(c["type"].split("::")[-1] for c in components)),
         }
     finally:

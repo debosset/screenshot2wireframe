@@ -5,268 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SnapWire — Screenshot to Balsamiq</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f0efe8;
-      color: #1a1a1a;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 48px 16px 32px;
-    }
-
-    /* ── Logo + titre ── */
-    .hero { text-align: center; margin-bottom: 36px; }
-
-    .logo-wrap {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 72px; height: 72px;
-      background: #1a1a2e;
-      border-radius: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 20px rgba(26,26,46,0.18);
-    }
-    .logo-svg { width: 40px; height: 40px; }
-
-    .brand {
-      font-size: 2.2rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      color: #1a1a2e;
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-    .brand span {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .tagline {
-      font-size: 0.95rem;
-      color: #666;
-      letter-spacing: 0.01em;
-    }
-
-    /* ── Card ── */
-    .card {
-      background: #fff;
-      border-radius: 20px;
-      border: 1px solid #e4e4dc;
-      padding: 32px;
-      width: 100%;
-      max-width: 600px;
-      box-shadow: 0 2px 24px rgba(0,0,0,0.07);
-    }
-
-    /* ── Drop zone ── */
-    #dropzone {
-      border: 2px dashed #d0cfc8;
-      border-radius: 14px;
-      padding: 40px 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      position: relative;
-      background: #fafaf7;
-    }
-    #dropzone.dragover, #dropzone.pasteover {
-      border-color: #667eea;
-      background: #f0f0ff;
-    }
-    #dropzone input[type=file] {
-      position: absolute; inset: 0; opacity: 0;
-      cursor: pointer; width: 100%; height: 100%;
-    }
-    .drop-icon { font-size: 2.2rem; margin-bottom: 10px; }
-    #dropzone p { color: #555; font-size: 0.9rem; margin: 3px 0; }
-    #dropzone strong { color: #1a1a1a; }
-    .hint {
-      margin-top: 10px;
-      font-size: 0.8rem;
-      color: #999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-    .hint kbd {
-      background: #f0efe8;
-      border: 1px solid #d0cfc8;
-      border-radius: 5px;
-      padding: 2px 8px;
-      font-family: monospace;
-      font-size: 0.8rem;
-      color: #555;
-    }
-
-    /* ── Preview ── */
-    #preview-wrap { margin-top: 16px; display: none; position: relative; }
-    #preview-wrap img {
-      width: 100%; border-radius: 10px;
-      border: 1px solid #e4e4dc;
-      max-height: 260px; object-fit: contain;
-      background: #fafaf7; display: block;
-    }
-    #clear-btn {
-      position: absolute; top: 8px; right: 8px;
-      background: rgba(0,0,0,0.45); color: #fff;
-      border: none; border-radius: 50%;
-      width: 28px; height: 28px;
-      cursor: pointer; font-size: 16px;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* ── Bouton convert ── */
-    #convert-btn {
-      margin-top: 20px; width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; border: none;
-      border-radius: 12px;
-      font-size: 1rem; font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-      letter-spacing: 0.01em;
-    }
-    #convert-btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
-    #convert-btn:active:not(:disabled) { transform: translateY(0); }
-    #convert-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* ── Progress ── */
-    #progress { display: none; margin-top: 20px; }
-    .progress-bar-wrap {
-      height: 5px; background: #eee;
-      border-radius: 3px; overflow: hidden;
-    }
-    .progress-bar {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      border-radius: 3px; transition: width 0.4s ease;
-    }
-    #status-text {
-      font-size: 0.83rem; color: #888;
-      margin-top: 8px; text-align: center;
-    }
-
-    /* ── Erreur ── */
-    #error {
-      display: none; margin-top: 16px;
-      padding: 12px 16px;
-      background: #fff3f3; border: 1px solid #ffcdd2;
-      border-radius: 10px; color: #c62828; font-size: 0.88rem;
-    }
-
-    /* ── Résultat ── */
-    #result { display: none; margin-top: 24px; }
-    .result-box {
-      background: linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 100%);
-      border: 1px solid #c5cae9;
-      border-radius: 14px; padding: 22px;
-    }
-    .result-box h3 {
-      font-size: 1rem; color: #1a237e;
-      margin-bottom: 4px; font-weight: 600;
-    }
-    .result-info { font-size: 0.85rem; color: #666; margin-bottom: 16px; }
-
-    .steps {
-      background: #fff; border-radius: 10px;
-      border: 1px solid #ddd;
-      padding: 14px 16px; margin-bottom: 16px;
-      font-size: 0.85rem; color: #333; line-height: 1.8;
-    }
-    .steps ol { padding-left: 18px; }
-    .steps kbd {
-      background: #e8eaf6; border: 1px solid #9fa8da;
-      border-radius: 4px; padding: 1px 7px;
-      font-family: monospace; font-size: 0.8rem; color: #283593;
-    }
-
-    #copy-btn {
-      width: 100%; padding: 13px;
-      background: #1a237e; color: #fff;
-      border: none; border-radius: 10px;
-      font-size: 0.95rem; font-weight: 600;
-      cursor: pointer; transition: background 0.2s, transform 0.1s;
-      display: flex; align-items: center;
-      justify-content: center; gap: 8px;
-    }
-    #copy-btn:hover { background: #283593; transform: translateY(-1px); }
-    #copy-btn.copied { background: #2e7d32; }
-
-    .tag-list { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
-    .tag {
-      background: #e8eaf6; color: #3949ab;
-      border-radius: 6px; padding: 3px 10px; font-size: 0.78rem;
-    }
-
-    /* ── Footer ── */
-    footer {
-      margin-top: 32px;
-      font-size: 0.82rem;
-      color: #aaa;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    footer .heart {
-      color: #e05c7a;
-      font-size: 0.9rem;
-      animation: heartbeat 1.4s ease-in-out infinite;
-    }
-    footer a { color: #888; text-decoration: none; border-bottom: 1px solid #ddd; }
-    footer a:hover { color: #444; border-color: #aaa; }
-    @keyframes heartbeat {
-      0%, 100% { transform: scale(1); }
-      14% { transform: scale(1.25); }
-      28% { transform: scale(1); }
-      42% { transform: scale(1.15); }
-      56% { transform: scale(1); }
-    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0efe8;color:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 16px 32px}
+    .hero{text-align:center;margin-bottom:32px}
+    .logo-wrap{display:inline-flex;align-items:center;justify-content:center;width:68px;height:68px;background:#1a1a2e;border-radius:18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(26,26,46,0.18)}
+    .brand{font-size:2rem;font-weight:700;letter-spacing:-0.03em;color:#1a1a2e;line-height:1;margin-bottom:5px}
+    .brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .tagline{font-size:0.9rem;color:#888}
+    .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:580px;box-shadow:0 2px 24px rgba(0,0,0,0.07)}
+    #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
+    #dropzone.on{border-color:#667eea;background:#f0f0ff}
+    #dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .drop-icon{font-size:2rem;margin-bottom:8px}
+    #dropzone p{color:#555;font-size:0.88rem;margin:3px 0}
+    #dropzone strong{color:#1a1a1a}
+    .hint{margin-top:8px;font-size:0.78rem;color:#aaa;display:flex;align-items:center;justify-content:center;gap:8px}
+    .hint kbd{background:#f0efe8;border:1px solid #d0cfc8;border-radius:4px;padding:1px 7px;font-family:monospace;font-size:0.76rem;color:#666}
+    #preview-wrap{margin-top:14px;display:none;position:relative}
+    #preview-wrap img{width:100%;border-radius:10px;border:1px solid #e4e4dc;max-height:240px;object-fit:contain;background:#fafaf7;display:block}
+    #clear-btn{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.4);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+    #convert-btn{margin-top:18px;width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity .2s,transform .1s;letter-spacing:.01em}
+    #convert-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+    #convert-btn:disabled{opacity:.4;cursor:not-allowed}
+    #progress{display:none;margin-top:18px}
+    .pbar-wrap{height:5px;background:#eee;border-radius:3px;overflow:hidden}
+    .pbar{height:100%;width:0%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:3px;transition:width .4s ease}
+    #status{font-size:.82rem;color:#999;margin-top:7px;text-align:center}
+    #error{display:none;margin-top:14px;padding:12px 16px;background:#fff3f3;border:1px solid #ffcdd2;border-radius:10px;color:#c62828;font-size:.87rem}
+    #result{display:none;margin-top:22px}
+    .result-box{background:linear-gradient(135deg,#f0f0ff,#f5f0ff);border:1px solid #c5cae9;border-radius:14px;padding:20px}
+    .result-box h3{font-size:.95rem;color:#1a237e;margin-bottom:3px;font-weight:600}
+    .result-info{font-size:.83rem;color:#777;margin-bottom:14px}
+    .steps{background:#fff;border-radius:10px;border:1px solid #ddd;padding:13px 16px;margin-bottom:14px;font-size:.84rem;color:#333;line-height:1.85}
+    .steps ol{padding-left:17px}
+    .steps kbd{background:#e8eaf6;border:1px solid #9fa8da;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:.78rem;color:#283593}
+    #copy-btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .2s,transform .1s;display:flex;align-items:center;justify-content:center;gap:7px}
+    #copy-btn:hover{background:#283593;transform:translateY(-1px)}
+    #copy-btn.ok{background:#2e7d32}
+    .tags{margin-top:11px;display:flex;flex-wrap:wrap;gap:5px}
+    .tag{background:#e8eaf6;color:#3949ab;border-radius:6px;padding:3px 10px;font-size:.76rem}
+    footer{margin-top:28px;font-size:.8rem;color:#bbb;display:flex;align-items:center;gap:5px}
+    footer a{color:#999;text-decoration:none;border-bottom:1px solid #ddd}
+    footer a:hover{color:#555}
+    .heart{color:#e05c7a;animation:hb 1.4s ease-in-out infinite;display:inline-block}
+    @keyframes hb{0%,100%{transform:scale(1)}14%{transform:scale(1.3)}28%{transform:scale(1)}42%{transform:scale(1.15)}56%{transform:scale(1)}}
   </style>
 </head>
 <body>
-
-  <!-- ── Hero ── -->
   <div class="hero">
     <div class="logo-wrap">
-      <svg class="logo-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Écran / screenshot -->
+      <svg width="38" height="38" viewBox="0 0 40 40" fill="none">
         <rect x="3" y="6" width="26" height="19" rx="3" fill="none" stroke="#667eea" stroke-width="2"/>
-        <rect x="7" y="10" width="6" height="5" rx="1" fill="#667eea" opacity="0.5"/>
-        <rect x="15" y="10" width="10" height="2" rx="1" fill="#667eea" opacity="0.6"/>
-        <rect x="15" y="14" width="7" height="2" rx="1" fill="#667eea" opacity="0.4"/>
-        <rect x="7" y="17" width="18" height="2" rx="1" fill="#667eea" opacity="0.3"/>
-        <!-- Flèche -->
-        <path d="M30 15 L36 15" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
-        <path d="M33 12 L36 15 L33 18" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Wireframe simplifié -->
+        <rect x="7" y="10" width="6" height="5" rx="1" fill="#667eea" opacity=".5"/>
+        <rect x="15" y="10" width="10" height="2" rx="1" fill="#667eea" opacity=".6"/>
+        <rect x="15" y="14" width="7" height="2" rx="1" fill="#667eea" opacity=".4"/>
+        <rect x="7" y="17" width="18" height="2" rx="1" fill="#667eea" opacity=".3"/>
+        <path d="M30 15L36 15" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+        <path d="M33 12L36 15L33 18" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <rect x="22" y="24" width="15" height="12" rx="2" fill="none" stroke="#c4b5fd" stroke-width="1.5"/>
-        <rect x="24" y="26" width="4" height="3" rx="0.5" fill="none" stroke="#c4b5fd" stroke-width="1"/>
-        <rect x="24" y="30" width="11" height="1.5" rx="0.5" fill="#c4b5fd" opacity="0.5"/>
-        <rect x="24" y="33" width="8" height="1.5" rx="0.5" fill="#c4b5fd" opacity="0.3"/>
+        <rect x="24" y="26" width="4" height="3" rx=".5" fill="none" stroke="#c4b5fd" stroke-width="1"/>
+        <rect x="24" y="30" width="11" height="1.5" rx=".5" fill="#c4b5fd" opacity=".5"/>
+        <rect x="24" y="33" width="8" height="1.5" rx=".5" fill="#c4b5fd" opacity=".3"/>
       </svg>
     </div>
     <div class="brand">Snap<span>Wire</span></div>
     <p class="tagline">Screenshot → Wireframe Balsamiq en un clic</p>
   </div>
 
-  <!-- ── Card principale ── -->
   <div class="card">
     <div id="dropzone">
       <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp">
       <div class="drop-icon">🖼️</div>
       <p><strong>Glissez, collez ou importez un screenshot</strong></p>
-      <div class="hint">
-        <kbd>Ctrl+V</kbd> pour coller · ou cliquer pour parcourir
-      </div>
+      <div class="hint"><kbd>Ctrl+V</kbd> pour coller · ou cliquer pour parcourir</div>
     </div>
 
     <div id="preview-wrap">
@@ -277,170 +88,98 @@
     <button id="convert-btn" disabled>Analyser et générer le JSON Balsamiq</button>
 
     <div id="progress">
-      <div class="progress-bar-wrap"><div class="progress-bar" id="pbar"></div></div>
-      <p id="status-text">Analyse en cours…</p>
+      <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
+      <p id="status">Analyse en cours…</p>
     </div>
 
     <div id="error"></div>
 
     <div id="result">
       <div class="result-box">
-        <h3>JSON généré !</h3>
+        <h3>Prêt à coller dans Balsamiq !</h3>
         <p class="result-info" id="result-info"></p>
         <div class="steps">
           <ol>
-            <li>Cliquez <strong>Copier le JSON</strong> ci-dessous</li>
-            <li>Ouvrez Balsamiq et votre mockup</li>
-            <li>Faites <kbd>Ctrl+V</kbd> (ou <kbd>⌘V</kbd> sur Mac)</li>
-            <li>Les composants apparaissent directement ✓</li>
+            <li>Cliquez <strong>Copier</strong> ci-dessous</li>
+            <li>Ouvrez Balsamiq et votre wireframe</li>
+            <li>Faites <kbd>Ctrl+V</kbd> — les composants apparaissent ✓</li>
           </ol>
         </div>
-        <button id="copy-btn">📋 Copier le JSON Balsamiq</button>
-        <div class="tag-list" id="tag-list"></div>
+        <button id="copy-btn">📋 Copier et coller dans Balsamiq</button>
+        <div class="tags" id="tags"></div>
       </div>
     </div>
   </div>
 
-  <!-- ── Footer ── -->
-  <footer>
-    Fait avec <span class="heart">♥</span> par
-    <a href="https://github.com/debosset" target="_blank">Adrien de Bosset</a>
-  </footer>
+  <footer>Fait avec <span class="heart">♥</span> par <a href="https://github.com/debosset" target="_blank">Adrien de Bosset</a></footer>
 
   <script>
-    const dropzone    = document.getElementById('dropzone');
-    const fileInput   = document.getElementById('file-input');
-    const preview     = document.getElementById('preview');
-    const previewWrap = document.getElementById('preview-wrap');
-    const convertBtn  = document.getElementById('convert-btn');
-    const progress    = document.getElementById('progress');
-    const pbar        = document.getElementById('pbar');
-    const statusText  = document.getElementById('status-text');
-    const result      = document.getElementById('result');
-    const errorDiv    = document.getElementById('error');
-    const copyBtn     = document.getElementById('copy-btn');
-    const clearBtn    = document.getElementById('clear-btn');
+    const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),
+    prev=document.getElementById('preview'),pw=document.getElementById('preview-wrap'),
+    btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),
+    pbar=document.getElementById('pbar'),stat=document.getElementById('status'),
+    res=document.getElementById('result'),err=document.getElementById('error'),
+    cpBtn=document.getElementById('copy-btn'),clrBtn=document.getElementById('clear-btn');
+    let file=null,bmlf=null;
 
-    let selectedFile = null;
-    let clipboardJson = null;
+    fi.onchange=e=>load(e.target.files[0]);
+    dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};
+    dz.ondragleave=()=>dz.classList.remove('on');
+    dz.ondrop=e=>{e.preventDefault();dz.classList.remove('on');load(e.dataTransfer.files[0])};
 
-    fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
-
-    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-    dropzone.addEventListener('drop', e => {
-      e.preventDefault(); dropzone.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
-    });
-
-    document.addEventListener('paste', e => {
-      for (const item of (e.clipboardData?.items || [])) {
-        if (item.type.startsWith('image/')) {
-          const f = item.getAsFile();
-          if (f) { loadFile(f); break; }
-        }
+    document.addEventListener('paste',e=>{
+      for(const it of(e.clipboardData?.items||[])){
+        if(it.type.startsWith('image/')){load(it.getAsFile());break}
       }
     });
-
-    window.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        dropzone.classList.add('pasteover');
-        setTimeout(() => dropzone.classList.remove('pasteover'), 500);
-      }
+    window.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&e.key==='v'){dz.classList.add('on');setTimeout(()=>dz.classList.remove('on'),500)}
     });
 
-    function loadFile(file) {
-      if (!file || !file.type.startsWith('image/')) return;
-      selectedFile = file;
-      preview.src = URL.createObjectURL(file);
-      previewWrap.style.display = 'block';
-      convertBtn.disabled = false;
-      result.style.display = 'none';
-      errorDiv.style.display = 'none';
-      clipboardJson = null;
+    function load(f){
+      if(!f||!f.type.startsWith('image/'))return;
+      file=f;prev.src=URL.createObjectURL(f);pw.style.display='block';
+      btn.disabled=false;res.style.display='none';err.style.display='none';bmlf=null;
     }
+    clrBtn.onclick=()=>{
+      file=bmlf=null;prev.src='';pw.style.display='none';
+      btn.disabled=true;res.style.display='none';err.style.display='none';fi.value='';
+    };
 
-    clearBtn.addEventListener('click', () => {
-      selectedFile = null; clipboardJson = null;
-      preview.src = ''; previewWrap.style.display = 'none';
-      convertBtn.disabled = true;
-      result.style.display = 'none';
-      errorDiv.style.display = 'none';
-      fileInput.value = '';
-    });
+    btn.onclick=async()=>{
+      if(!file)return;
+      btn.disabled=true;err.style.display='none';res.style.display='none';prog.style.display='block';
+      const steps=[[20,"Chargement…"],[50,"Détection des contours…"],[75,"Classification…"],[92,"Génération BMLF…"]];
+      let si=0;
+      const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},500);
+      try{
+        const fd=new FormData();fd.append('file',file);
+        const r=await fetch('/convert',{method:'POST',body:fd});
+        const d=await r.json();
+        clearInterval(t);
+        if(!r.ok)throw new Error(d.detail||'Erreur serveur');
+        bmlf=d.clipboard_bmlf;
+        pbar.style.width='100%';stat.textContent='Terminé !';
+        await new Promise(r=>setTimeout(r,300));
+        prog.style.display='none';
+        document.getElementById('result-info').textContent=`${d.components_count} composants détectés.`;
+        const tg=document.getElementById('tags');tg.innerHTML='';
+        (d.types||[]).forEach(t=>{const s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s)});
+        res.style.display='block';
+      }catch(e){
+        clearInterval(t);prog.style.display='none';
+        err.textContent=e.message;err.style.display='block';
+      }finally{btn.disabled=false}
+    };
 
-    convertBtn.addEventListener('click', async () => {
-      if (!selectedFile) return;
-      convertBtn.disabled = true;
-      errorDiv.style.display = 'none';
-      result.style.display = 'none';
-      progress.style.display = 'block';
-
-      const steps = [
-        [20, 'Chargement de l\'image…'],
-        [50, 'Détection des contours…'],
-        [75, 'Classification des composants…'],
-        [92, 'Génération du JSON Balsamiq…'],
-      ];
-      let si = 0;
-      const tick = setInterval(() => {
-        if (si < steps.length) {
-          pbar.style.width = steps[si][0] + '%';
-          statusText.textContent = steps[si][1];
-          si++;
-        }
-      }, 500);
-
-      try {
-        const fd = new FormData();
-        fd.append('file', selectedFile);
-        const res = await fetch('/convert', { method: 'POST', body: fd });
-        const data = await res.json();
-        clearInterval(tick);
-        if (!res.ok) throw new Error(data.detail || 'Erreur serveur');
-        clipboardJson = data.clipboard_json;
-        pbar.style.width = '100%';
-        statusText.textContent = 'Terminé !';
-        await new Promise(r => setTimeout(r, 300));
-        progress.style.display = 'none';
-        document.getElementById('result-info').textContent =
-          `${data.components_count} composants détectés.`;
-        const tagList = document.getElementById('tag-list');
-        tagList.innerHTML = '';
-        (data.types || []).forEach(t => {
-          const s = document.createElement('span');
-          s.className = 'tag'; s.textContent = t;
-          tagList.appendChild(s);
-        });
-        result.style.display = 'block';
-      } catch(e) {
-        clearInterval(tick);
-        progress.style.display = 'none';
-        errorDiv.textContent = e.message;
-        errorDiv.style.display = 'block';
-      } finally {
-        convertBtn.disabled = false;
-      }
-    });
-
-    copyBtn.addEventListener('click', async () => {
-      if (!clipboardJson) return;
-      try {
-        await navigator.clipboard.writeText(clipboardJson);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = clipboardJson;
-        document.body.appendChild(ta);
-        ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      copyBtn.textContent = '✓ Copié ! Collez dans Balsamiq avec Ctrl+V';
-      copyBtn.classList.add('copied');
-      setTimeout(() => {
-        copyBtn.innerHTML = '📋 Copier le JSON Balsamiq';
-        copyBtn.classList.remove('copied');
-      }, 3000);
-    });
+    cpBtn.onclick=async()=>{
+      if(!bmlf)return;
+      try{await navigator.clipboard.writeText(bmlf)}
+      catch{const ta=document.createElement('textarea');ta.value=bmlf;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}
+      cpBtn.textContent='✓ Copié ! Faites Ctrl+V dans Balsamiq';
+      cpBtn.classList.add('ok');
+      setTimeout(()=>{cpBtn.innerHTML='📋 Copier et coller dans Balsamiq';cpBtn.classList.remove('ok')},3000);
+    };
   </script>
 </body>
 </html>
