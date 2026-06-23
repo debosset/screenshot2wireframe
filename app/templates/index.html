@@ -3,26 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SnapWire — Screenshot to Balsamiq</title>
+  <title>SnapWire — Screenshot to Balsamiq Clipboard</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0efe8;color:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 16px 32px}
     .hero{text-align:center;margin-bottom:32px}.brand{font-size:2rem;font-weight:700;color:#1a1a2e}.brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.tagline{font-size:.9rem;color:#888}
-    .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:620px;box-shadow:0 2px 24px rgba(0,0,0,.07)}
+    .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:660px;box-shadow:0 2px 24px rgba(0,0,0,.07)}
+    .pid-row{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}.pid-row label{font-size:.8rem;color:#888;font-weight:600}.pid-row input{padding:9px 12px;border:1px solid #d0cfc8;border-radius:8px;font-size:.85rem;color:#333;background:#fafaf7;outline:none}.pid-hint{font-size:.75rem;color:#999;line-height:1.35}
     #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
     #dropzone.on{border-color:#667eea;background:#f0f0ff}#dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}#dropzone p{color:#555;font-size:.9rem;margin:3px 0}.hint{margin-top:8px;font-size:.78rem;color:#aaa}.hint kbd{background:#f0efe8;border:1px solid #d0cfc8;border-radius:4px;padding:1px 7px;font-family:monospace;font-size:.76rem;color:#666}
     #preview-wrap{margin-top:14px;display:none;position:relative}#preview-wrap img{width:100%;border-radius:10px;border:1px solid #e4e4dc;max-height:240px;object-fit:contain;background:#fafaf7;display:block}#clear-btn{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.4);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:15px}
-    button,a.action-btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}#convert-btn{margin-top:18px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:1rem}.action-btn{margin-top:10px}.btn-primary{background:#1a237e;color:#fff}button:disabled{opacity:.4;cursor:not-allowed}
+    button,a.action-btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}#convert-btn{margin-top:18px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:1rem}.action-btn{margin-top:10px}.btn-primary{background:#1a237e;color:#fff}.btn-secondary{background:#fff;color:#1a237e;border:1px solid #c5cae9}.ok{background:#2e7d32!important;color:#fff!important}button:disabled{opacity:.4;cursor:not-allowed}
     #progress,#result,#error{display:none;margin-top:18px}.pbar-wrap{height:5px;background:#eee;border-radius:3px;overflow:hidden}.pbar{height:100%;width:0%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width .4s ease}#status{font-size:.82rem;color:#999;margin-top:7px;text-align:center}#error{padding:12px 16px;background:#fff3f3;border:1px solid #ffcdd2;border-radius:10px;color:#c62828;font-size:.87rem}
-    .result-box{background:linear-gradient(135deg,#f0f0ff,#f5f0ff);border:1px solid #c5cae9;border-radius:14px;padding:20px}.result-info{font-size:.82rem;color:#777;margin-bottom:14px}.steps{background:#fff;border-radius:10px;border:1px solid #ddd;padding:12px 16px;margin-bottom:14px;font-size:.83rem;color:#333;line-height:1.7}.steps ol{padding-left:18px}.warning{margin-top:10px;padding:10px 12px;border-radius:10px;background:#fff8e1;border:1px solid #ffe082;color:#6d4c00;font-size:.82rem;line-height:1.45}.tags{margin-top:12px;display:flex;flex-wrap:wrap;gap:5px}.tag{background:#e8eaf6;color:#3949ab;border-radius:6px;padding:3px 10px;font-size:.75rem}footer{margin-top:28px;font-size:.8rem;color:#bbb}
+    .result-box{background:linear-gradient(135deg,#f0f0ff,#f5f0ff);border:1px solid #c5cae9;border-radius:14px;padding:20px}.result-info{font-size:.82rem;color:#777;margin-bottom:14px}.steps{background:#fff;border-radius:10px;border:1px solid #ddd;padding:12px 16px;margin-bottom:14px;font-size:.83rem;color:#333;line-height:1.7}.steps ol{padding-left:18px}.warning{margin-top:10px;padding:10px 12px;border-radius:10px;background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;font-size:.82rem;line-height:1.45}.tags{margin-top:12px;display:flex;flex-wrap:wrap;gap:5px}.tag{background:#e8eaf6;color:#3949ab;border-radius:6px;padding:3px 10px;font-size:.75rem}footer{margin-top:28px;font-size:.8rem;color:#bbb}
   </style>
 </head>
 <body>
-  <div class="hero"><div class="brand">Snap<span>Wire</span></div><p class="tagline">Screenshot → fichier BMML importable dans Balsamiq</p></div>
+  <div class="hero"><div class="brand">Snap<span>Wire</span></div><p class="tagline">Screenshot → JSON clipboard Balsamiq</p></div>
   <div class="card">
+    <div class="pid-row">
+      <label>Project ID Balsamiq</label>
+      <input type="text" id="pid" value="1865909467:1865909468" spellcheck="false">
+      <span class="pid-hint">Le Project ID doit venir de ton Balsamiq. Tu peux le récupérer via un copier d'un composant existant.</span>
+    </div>
+
     <div id="dropzone">
       <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif">
-      <p><strong>Glissez, collez ou importez un screenshot</strong></p>
+      <p><strong>Glisse, colle ou importe un screenshot</strong></p>
       <div class="hint"><kbd>Ctrl+V</kbd> pour coller une image · ou cliquer pour parcourir</div>
     </div>
     <div id="preview-wrap"><img id="preview" src="" alt="Aperçu"><button id="clear-btn">×</button></div>
@@ -30,25 +37,27 @@
     <div id="progress"><div class="pbar-wrap"><div class="pbar" id="pbar"></div></div><p id="status">Analyse en cours…</p></div>
     <div id="error"></div>
     <div id="result"><div class="result-box">
-      <h3>Wireframe généré !</h3>
+      <h3>Composants générés !</h3>
       <p class="result-info" id="result-info"></p>
-      <div class="steps"><strong>Utilisation dans Balsamiq</strong><ol><li>Télécharge le fichier <strong>.bmml</strong></li><li>Dans Balsamiq : <strong>Project / Import / Import BMML</strong></li><li>Sélectionne le fichier téléchargé</li></ol><div class="warning">Le copier-coller direct n'est pas fiable dans Balsamiq Confluence : si on copie le XML, Balsamiq le colle comme du texte. L'import BMML est la méthode correcte.</div></div>
-      <a id="dl-btn" class="action-btn btn-primary" href="#">⬇ Télécharger le fichier .bmpr</a>
+      <div class="steps"><strong>Coller dans Balsamiq</strong><ol><li>Clique sur <strong>Copier pour Balsamiq</strong></li><li>Ouvre ta page Balsamiq existante</li><li>Fais <strong>Ctrl+V</strong></li></ol><div class="warning">Cette version copie le même format text/plain que ton exemple de checkbox, pas du BMML et pas du BMPR.</div></div>
+      <button id="copy-btn" class="action-btn btn-primary">📋 Copier pour Balsamiq</button>
+      <a id="dl-btn" class="action-btn btn-secondary" href="#">⬇ Télécharger le JSON pour contrôle</a>
       <div class="tags" id="tags"></div>
     </div></div>
   </div>
   <footer>Fait avec ♥ par Adrien de Bosset</footer>
 <script>
-const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),prev=document.getElementById('preview'),pw=document.getElementById('preview-wrap'),btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),pbar=document.getElementById('pbar'),stat=document.getElementById('status'),res=document.getElementById('result'),err=document.getElementById('error'),dlBtn=document.getElementById('dl-btn'),clrBtn=document.getElementById('clear-btn');
-let file=null;
+const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),prev=document.getElementById('preview'),pw=document.getElementById('preview-wrap'),btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),pbar=document.getElementById('pbar'),stat=document.getElementById('status'),res=document.getElementById('result'),err=document.getElementById('error'),dlBtn=document.getElementById('dl-btn'),clrBtn=document.getElementById('clear-btn'),pid=document.getElementById('pid'),copyBtn=document.getElementById('copy-btn');
+let file=null,clipJson=null;
 fi.onchange=e=>load(e.target.files[0]);
 dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};
 dz.ondragleave=()=>dz.classList.remove('on');
 dz.ondrop=e=>{e.preventDefault();dz.classList.remove('on');load(e.dataTransfer.files[0])};
 document.addEventListener('paste',e=>{for(const it of(e.clipboardData?.items||[])){if(it.type.startsWith('image/')){load(it.getAsFile());break}}});
-function load(f){if(!f||!f.type.startsWith('image/'))return;file=f;prev.src=URL.createObjectURL(f);pw.style.display='block';btn.disabled=false;res.style.display='none';err.style.display='none'}
-clrBtn.onclick=()=>{file=null;prev.src='';pw.style.display='none';btn.disabled=true;res.style.display='none';err.style.display='none';fi.value=''};
-btn.onclick=async()=>{if(!file)return;btn.disabled=true;err.style.display='none';res.style.display='none';prog.style.display='block';pbar.style.width='30%';stat.textContent='Analyse OpenCV…';try{const fd=new FormData();fd.append('file',file);const r=await fetch('/convert',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Erreur serveur');dlBtn.href=d.download_url;pbar.style.width='100%';stat.textContent='Terminé !';setTimeout(()=>prog.style.display='none',250);document.getElementById('result-info').textContent=`${d.components_count} composants détectés : ${(d.types||[]).join(', ')}`;const tg=document.getElementById('tags');tg.innerHTML='';(d.types||[]).forEach(t=>{const s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s)});res.style.display='block'}catch(e){prog.style.display='none';err.textContent=e.message;err.style.display='block'}finally{btn.disabled=false}};
+function load(f){if(!f||!f.type.startsWith('image/'))return;file=f;prev.src=URL.createObjectURL(f);pw.style.display='block';btn.disabled=false;res.style.display='none';err.style.display='none';clipJson=null}
+clrBtn.onclick=()=>{file=clipJson=null;prev.src='';pw.style.display='none';btn.disabled=true;res.style.display='none';err.style.display='none';fi.value=''};
+btn.onclick=async()=>{if(!file)return;btn.disabled=true;err.style.display='none';res.style.display='none';prog.style.display='block';pbar.style.width='30%';stat.textContent='Analyse OpenCV…';try{const fd=new FormData();fd.append('file',file);fd.append('project_id',pid.value.trim()||'0:1');const r=await fetch('/convert',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Erreur serveur');clipJson=d.clipboard_json;dlBtn.href=d.download_url;pbar.style.width='100%';stat.textContent='Terminé !';setTimeout(()=>prog.style.display='none',250);document.getElementById('result-info').textContent=`${d.components_count} composants détectés : ${(d.types||[]).join(', ')}`;const tg=document.getElementById('tags');tg.innerHTML='';(d.types||[]).forEach(t=>{const s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s)});res.style.display='block'}catch(e){prog.style.display='none';err.textContent=e.message;err.style.display='block'}finally{btn.disabled=false}};
+copyBtn.onclick=async()=>{if(!clipJson)return;try{await navigator.clipboard.writeText(clipJson)}catch{const ta=document.createElement('textarea');ta.value=clipJson;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}copyBtn.textContent='✓ Copié !';copyBtn.classList.add('ok');setTimeout(()=>{copyBtn.textContent='📋 Copier pour Balsamiq';copyBtn.classList.remove('ok')},2500)};
 </script>
 </body>
 </html>

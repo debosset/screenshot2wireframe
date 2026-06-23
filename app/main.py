@@ -1,23 +1,24 @@
 import shutil
 import uuid
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from .balsamiq_json import classify
-from .bmml_builder import build_bmml
+from .balsamiq_json import classify, to_clipboard_json
 from .opencv_analyzer import analyze_screenshot
 
 BASE_DIR = Path(__file__).parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "outputs"
 UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="SnapWire")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# Petit cache mémoire pour permettre le téléchargement du JSON après conversion.
+CLIPBOARD_CACHE = {}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -26,7 +27,10 @@ async def index(request: Request):
 
 
 @app.post("/convert")
-async def convert(file: UploadFile = File(...)):
+async def convert(
+    file: UploadFile = File(...),
+    project_id: Optional[str] = Form("0:1"),
+):
     if file.content_type not in {"image/png", "image/jpeg", "image/webp", "image/gif"}:
         raise HTTPException(400, "Format non supporté.")
 
@@ -46,16 +50,16 @@ async def convert(file: UploadFile = File(...)):
         img_h = max((c["y"] + c["h"]) for c in components)
 
         for c in components:
-            c["typeID"] = classify(c["type"], c["x"], c["y"], c["w"], c["h"], img_w, img_h)
+            c["typeID"] = classify(c.get("type", "Rectangle"), c["x"], c["y"], c["w"], c["h"], img_w, img_h)
 
-        title = Path(file.filename or "wireframe").stem
-        output_path = OUTPUT_DIR / f"{job_id}.bmml"
-        build_bmml(components, str(output_path), title)
+        clipboard_json = to_clipboard_json(components, project_id=project_id or "0:1")
+        CLIPBOARD_CACHE[job_id] = clipboard_json
 
         return {
             "job_id": job_id,
             "components_count": len(components),
-            "download_url": f"/download/{job_id}",
+            "clipboard_json": clipboard_json,
+            "download_url": f"/download-json/{job_id}",
             "types": sorted(set(c["typeID"] for c in components)),
         }
     finally:
@@ -63,15 +67,14 @@ async def convert(file: UploadFile = File(...)):
             upload_path.unlink()
 
 
-@app.get("/download/{job_id}")
-async def download(job_id: str):
+@app.get("/download-json/{job_id}")
+async def download_json(job_id: str):
     safe_id = job_id.replace("..", "").replace("/", "")
-    file_path = OUTPUT_DIR / f"{safe_id}.bmml"
-    if not file_path.exists():
-        raise HTTPException(404, "Fichier introuvable.")
-
-    return FileResponse(
-        str(file_path),
-        media_type="application/xml; charset=utf-8",
-        filename=f"wireframe_{safe_id[:8]}.bmml",
+    content = CLIPBOARD_CACHE.get(safe_id)
+    if not content:
+        raise HTTPException(404, "JSON introuvable.")
+    return PlainTextResponse(
+        content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="balsamiq_clipboard_{safe_id[:8]}.json"'},
     )

@@ -1,33 +1,33 @@
-# Screenshot → Wireframe Balsamiq
+# Screenshot → Clipboard Balsamiq
 
-Convertit un screenshot PNG/JPG/WEBP/GIF en fichier `.bmml` importable dans Balsamiq Wireframes.
+Cette version ne génère ni BMML ni BMPR.
+Elle génère le JSON `text/plain` utilisé par Balsamiq lors d'un `Ctrl+C` sur un composant.
 
-## Important
+Workflow :
 
-Le copier-coller direct de XML/JSON dans Balsamiq Confluence colle souvent le contenu comme un bloc de texte.
-La méthode fiable est donc :
+1. Importer/coller un screenshot.
+2. Renseigner le `projectID` Balsamiq.
+3. Cliquer sur **Copier pour Balsamiq**.
+4. Aller dans la page Balsamiq existante et faire `Ctrl+V`.
 
-1. générer le `.bmml` ;
-2. télécharger le fichier ;
-3. dans Balsamiq : `Project / Import / Import BMML` ;
-4. sélectionner le fichier `.bmml`.
+Le format généré suit l'exemple réel :
 
-## Lancement local
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8001
-```
-
-Ouvrir ensuite : `http://localhost:8001`.
-
-## Structure
-
-```text
-app/main.py              API FastAPI
-app/opencv_analyzer.py   Détection OpenCV
-app/bmml_builder.py      Génération BMML XML
-app/templates/index.html Interface web
+```json
+{
+  "mockup": {
+    "controls": { "control": [] },
+    "attributes": { "name": "New Wireframe 1", "order": 123, "parentID": null, "notes": null },
+    "branchID": "Master",
+    "resourceID": "UUID",
+    "mockupH": "...",
+    "mockupW": "...",
+    "measuredW": "...",
+    "measuredH": "...",
+    "version": "1.0",
+    "calloutsOffset": { "x": 0, "y": 0 }
+  },
+  "groupOffset": { "x": 0, "y": 0 },
+  "dependencies": [],
+  "projectID": "..."
+}
 ```
