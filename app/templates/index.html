@@ -11,7 +11,7 @@
     .logo-wrap{display:inline-flex;align-items:center;justify-content:center;width:68px;height:68px;background:#1a1a2e;border-radius:18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(26,26,46,0.18)}
     .brand{font-size:2rem;font-weight:700;letter-spacing:-0.03em;color:#1a1a2e;margin-bottom:5px}
     .brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .tagline{font-size:0.9rem;color:#888}
+    .tagline{font-size:.9rem;color:#888}
     .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:580px;box-shadow:0 2px 24px rgba(0,0,0,0.07)}
     #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
     #dropzone.on{border-color:#667eea;background:#f0f0ff}
@@ -37,8 +37,10 @@
     .result-info{font-size:.83rem;color:#777;margin-bottom:14px}
     .steps{background:#fff;border-radius:10px;border:1px solid #ddd;padding:13px 16px;margin-bottom:14px;font-size:.84rem;color:#333;line-height:1.85}
     .steps ol{padding-left:17px}
-    #dl-btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .2s,transform .1s}
-    #dl-btn:hover{background:#283593;transform:translateY(-1px)}
+    .steps kbd{background:#e8eaf6;border:1px solid #9fa8da;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:.78rem;color:#283593}
+    #copy-btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .2s,transform .1s}
+    #copy-btn:hover{background:#283593;transform:translateY(-1px)}
+    #copy-btn.ok{background:#2e7d32}
     .tags{margin-top:11px;display:flex;flex-wrap:wrap;gap:5px}
     .tag{background:#e8eaf6;color:#3949ab;border-radius:6px;padding:3px 10px;font-size:.76rem}
     footer{margin-top:28px;font-size:.8rem;color:#bbb;display:flex;align-items:center;gap:5px}
@@ -80,7 +82,7 @@
       <img id="preview" src="" alt="Aperçu">
       <button id="clear-btn">×</button>
     </div>
-    <button id="convert-btn" disabled>Analyser et télécharger le .bmpr</button>
+    <button id="convert-btn" disabled>Analyser et générer le JSON</button>
     <div id="progress">
       <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
       <p id="status">Analyse en cours…</p>
@@ -88,16 +90,16 @@
     <div id="error"></div>
     <div id="result">
       <div class="result-box">
-        <h3>Fichier .bmpr prêt !</h3>
+        <h3>Prêt à coller dans Balsamiq !</h3>
         <p class="result-info" id="result-info"></p>
         <div class="steps">
           <ol>
-            <li>Téléchargez le fichier <strong>.bmpr</strong> ci-dessous</li>
-            <li>Dans Balsamiq : <strong>Fichier → Importer</strong> ou double-cliquez le fichier</li>
-            <li>Votre wireframe s'ouvre directement ✓</li>
+            <li>Cliquez <strong>Copier</strong> ci-dessous</li>
+            <li>Ouvrez Balsamiq dans votre wireframe</li>
+            <li>Faites <kbd>Ctrl+V</kbd> — les composants apparaissent ✓</li>
           </ol>
         </div>
-        <a id="dl-btn" href="#">⬇ Télécharger le fichier .bmpr</a>
+        <button id="copy-btn">📋 Copier et coller dans Balsamiq</button>
         <div class="tags" id="tags"></div>
       </div>
     </div>
@@ -111,8 +113,8 @@
     btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),
     pbar=document.getElementById('pbar'),stat=document.getElementById('status'),
     res=document.getElementById('result'),err=document.getElementById('error'),
-    dlBtn=document.getElementById('dl-btn'),clrBtn=document.getElementById('clear-btn');
-    let file=null;
+    cpBtn=document.getElementById('copy-btn'),clrBtn=document.getElementById('clear-btn');
+    let file=null,clipJson=null;
 
     fi.onchange=e=>load(e.target.files[0]);
     dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};
@@ -130,17 +132,17 @@
     function load(f){
       if(!f||!f.type.startsWith('image/'))return;
       file=f;prev.src=URL.createObjectURL(f);pw.style.display='block';
-      btn.disabled=false;res.style.display='none';err.style.display='none';
+      btn.disabled=false;res.style.display='none';err.style.display='none';clipJson=null;
     }
     clrBtn.onclick=()=>{
-      file=null;prev.src='';pw.style.display='none';
+      file=clipJson=null;prev.src='';pw.style.display='none';
       btn.disabled=true;res.style.display='none';err.style.display='none';fi.value='';
     };
 
     btn.onclick=async()=>{
       if(!file)return;
       btn.disabled=true;err.style.display='none';res.style.display='none';prog.style.display='block';
-      const steps=[[20,"Chargement…"],[50,"Détection des contours…"],[75,"Classification…"],[92,"Génération .bmpr…"]];
+      const steps=[[20,"Chargement…"],[50,"Détection des contours…"],[75,"Classification…"],[92,"Génération JSON…"]];
       let si=0;
       const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},500);
       try{
@@ -149,11 +151,11 @@
         const d=await r.json();
         clearInterval(t);
         if(!r.ok)throw new Error(d.detail||'Erreur serveur');
+        clipJson=d.clipboard_json;
         pbar.style.width='100%';stat.textContent='Terminé !';
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';
         document.getElementById('result-info').textContent=`${d.components_count} composants détectés.`;
-        dlBtn.href=d.download_url;
         const tg=document.getElementById('tags');tg.innerHTML='';
         (d.types||[]).forEach(t=>{const s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s)});
         res.style.display='block';
@@ -161,6 +163,15 @@
         clearInterval(t);prog.style.display='none';
         err.textContent=e.message;err.style.display='block';
       }finally{btn.disabled=false}
+    };
+
+    cpBtn.onclick=async()=>{
+      if(!clipJson)return;
+      try{await navigator.clipboard.writeText(clipJson)}
+      catch{const ta=document.createElement('textarea');ta.value=clipJson;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}
+      cpBtn.textContent='✓ Copié ! Faites Ctrl+V dans Balsamiq';
+      cpBtn.classList.add('ok');
+      setTimeout(()=>{cpBtn.innerHTML='📋 Copier et coller dans Balsamiq';cpBtn.classList.remove('ok')},3000);
     };
   </script>
 </body>
