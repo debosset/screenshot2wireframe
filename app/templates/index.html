@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenshot → Wireframe Balsamiq</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+    h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { color: #666; margin-bottom: 40px; font-size: 0.95rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e0e0e0;
+      padding: 32px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* Drop zone */
+    #dropzone {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    #dropzone.dragover { border-color: #5c6bc0; background: #f0f0ff; }
+    #dropzone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    #dropzone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    #dropzone p { color: #555; font-size: 0.9rem; }
+    #dropzone strong { color: #1a1a1a; }
+
+    #preview-wrap { margin-top: 16px; display: none; }
+    #preview-wrap img {
+      width: 100%; border-radius: 8px; border: 1px solid #e0e0e0;
+      max-height: 240px; object-fit: contain; background: #fafafa;
+    }
+
+    button#convert-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 14px;
+      background: #3f51b5;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    button#convert-btn:hover:not(:disabled) { background: #303f9f; }
+    button#convert-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Progress */
+    #progress { display: none; margin-top: 20px; }
+    .progress-bar-wrap {
+      height: 6px; background: #eee; border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3f51b5, #7986cb);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    #status-text { font-size: 0.85rem; color: #666; margin-top: 8px; }
+
+    /* Result */
+    #result { display: none; margin-top: 24px; }
+    .result-box {
+      background: #f0f4ff;
+      border: 1px solid #c5cae9;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .result-box h3 { font-size: 1rem; color: #1a237e; margin-bottom: 4px; }
+    .result-box p { font-size: 0.85rem; color: #555; margin-bottom: 16px; }
+    .result-box a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #3f51b5;
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .result-box a:hover { background: #303f9f; }
+    .tag-list { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      background: #e8eaf6;
+      color: #3949ab;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.78rem;
+    }
+
+    /* Error */
+    #error {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: #fff3f3;
+      border: 1px solid #ffcdd2;
+      border-radius: 8px;
+      color: #c62828;
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Screenshot → Wireframe</h1>
+  <p class="subtitle">Convertissez n'importe quel screenshot en fichier Balsamiq .bmpr</p>
+
+  <div class="card">
+    <div id="dropzone">
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp">
+      <div class="icon">🖼️</div>
+      <p><strong>Glissez votre screenshot ici</strong></p>
+      <p>ou cliquez pour parcourir — PNG, JPG, WEBP</p>
+    </div>
+
+    <div id="preview-wrap">
+      <img id="preview" src="" alt="Aperçu">
+    </div>
+
+    <button id="convert-btn" disabled>Convertir en wireframe</button>
+
+    <div id="progress">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="pbar"></div></div>
+      <p id="status-text">Analyse en cours…</p>
+    </div>
+
+    <div id="error"></div>
+
+    <div id="result">
+      <div class="result-box">
+        <h3>Wireframe généré !</h3>
+        <p id="result-info"></p>
+        <a id="download-link" href="#">Télécharger le fichier .bmpr</a>
+        <div class="tag-list" id="tag-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const preview = document.getElementById('preview');
+    const previewWrap = document.getElementById('preview-wrap');
+    const convertBtn = document.getElementById('convert-btn');
+    const progress = document.getElementById('progress');
+    const pbar = document.getElementById('pbar');
+    const statusText = document.getElementById('status-text');
+    const result = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
+    let selectedFile = null;
+
+    fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault(); dropzone.classList.remove('dragover');
+      loadFile(e.dataTransfer.files[0]);
+    });
+
+    function loadFile(file) {
+      if (!file) return;
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      preview.src = url;
+      previewWrap.style.display = 'block';
+      convertBtn.disabled = false;
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+    }
+
+    convertBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      convertBtn.disabled = true;
+      errorDiv.style.display = 'none';
+      result.style.display = 'none';
+      progress.style.display = 'block';
+
+      // Fake progress pendant l'analyse
+      let pct = 0;
+      const steps = [
+        [20, 'Chargement de l\'image…'],
+        [45, 'Détection des contours…'],
+        [70, 'Classification des composants…'],
+        [90, 'Génération du fichier .bmpr…'],
+      ];
+      let si = 0;
+      const tick = setInterval(() => {
+        if (si < steps.length) {
+          pct = steps[si][0];
+          statusText.textContent = steps[si][1];
+          pbar.style.width = pct + '%';
+          si++;
+        }
+      }, 600);
+
+      try {
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        const res = await fetch('/convert', { method: 'POST', body: fd });
+        const data = await res.json();
+        clearInterval(tick);
+
+        if (!res.ok) {
+          throw new Error(data.detail || 'Erreur serveur');
+        }
+
+        pbar.style.width = '100%';
+        statusText.textContent = 'Terminé !';
+        await new Promise(r => setTimeout(r, 400));
+        progress.style.display = 'none';
+
+        document.getElementById('result-info').textContent =
+          `${data.components_count} composants détectés et exportés.`;
+        document.getElementById('download-link').href = data.download_url;
+
+        const tagList = document.getElementById('tag-list');
+        tagList.innerHTML = '';
+        const types = [...new Set((data.components || []).map(c => c.type.split('::')[1]))];
+        types.forEach(t => {
+          const span = document.createElement('span');
+          span.className = 'tag';
+          span.textContent = t;
+          tagList.appendChild(span);
+        });
+
+        result.style.display = 'block';
+      } catch(e) {
+        clearInterval(tick);
+        progress.style.display = 'none';
+        errorDiv.textContent = e.message;
+        errorDiv.style.display = 'block';
+      } finally {
+        convertBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

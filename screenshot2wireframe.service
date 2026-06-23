@@ -1,0 +1,20 @@
+[Unit]
+Description=Screenshot2Wireframe FastAPI
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/vhosts/VOTRE_DOMAINE/screenshot2wireframe
+ExecStart=/var/www/vhosts/VOTRE_DOMAINE/screenshot2wireframe/venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port 8001 \
+    --workers 2
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
