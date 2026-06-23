@@ -1,8 +1,18 @@
 # Screenshot → Wireframe Balsamiq
 
-Version corrigée : le bouton de copie ne copie plus le JSON custom, mais le BMML XML généré.
+Convertit un screenshot PNG/JPG/WEBP/GIF en fichier `.bmml` importable dans Balsamiq Wireframes.
 
-## Lancer en local
+## Important
+
+Le copier-coller direct de XML/JSON dans Balsamiq Confluence colle souvent le contenu comme un bloc de texte.
+La méthode fiable est donc :
+
+1. générer le `.bmml` ;
+2. télécharger le fichier ;
+3. dans Balsamiq : `Project / Import / Import BMML` ;
+4. sélectionner le fichier `.bmml`.
+
+## Lancement local
 
 ```bash
 python3 -m venv venv
@@ -11,13 +21,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
-Ouvrir : http://localhost:8001
+Ouvrir ensuite : `http://localhost:8001`.
 
-## Correction principale
+## Structure
 
-- `main.py` renvoie maintenant `clipboard_bmml`.
-- `bmml_builder.py` expose `build_bmml_string()`.
-- `index.html` copie le BMML XML.
-- `opencv_analyzer.py` retourne des types courts cohérents (`NavBar`, `Button`, etc.).
-
-Pour Balsamiq Cloud/Confluence, l'import du `.bmml` reste la méthode la plus fiable.
+```text
+app/main.py              API FastAPI
+app/opencv_analyzer.py   Détection OpenCV
+app/bmml_builder.py      Génération BMML XML
+app/templates/index.html Interface web
+```
