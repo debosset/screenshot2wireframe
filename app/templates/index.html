@@ -9,7 +9,7 @@
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0efe8;color:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 16px 32px}
     .hero{text-align:center;margin-bottom:32px}
     .logo-wrap{display:inline-flex;align-items:center;justify-content:center;width:68px;height:68px;background:#1a1a2e;border-radius:18px;margin-bottom:14px;box-shadow:0 4px 20px rgba(26,26,46,0.18)}
-    .brand{font-size:2rem;font-weight:700;letter-spacing:-0.03em;color:#1a1a2e;line-height:1;margin-bottom:5px}
+    .brand{font-size:2rem;font-weight:700;letter-spacing:-0.03em;color:#1a1a2e;margin-bottom:5px}
     .brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .tagline{font-size:0.9rem;color:#888}
     .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:28px;width:100%;max-width:580px;box-shadow:0 2px 24px rgba(0,0,0,0.07)}
@@ -17,14 +17,13 @@
     #dropzone.on{border-color:#667eea;background:#f0f0ff}
     #dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
     .drop-icon{font-size:2rem;margin-bottom:8px}
-    #dropzone p{color:#555;font-size:0.88rem;margin:3px 0}
-    #dropzone strong{color:#1a1a1a}
-    .hint{margin-top:8px;font-size:0.78rem;color:#aaa;display:flex;align-items:center;justify-content:center;gap:8px}
-    .hint kbd{background:#f0efe8;border:1px solid #d0cfc8;border-radius:4px;padding:1px 7px;font-family:monospace;font-size:0.76rem;color:#666}
+    #dropzone p{color:#555;font-size:.88rem;margin:3px 0}
+    .hint{margin-top:8px;font-size:.78rem;color:#aaa;display:flex;align-items:center;justify-content:center;gap:8px}
+    .hint kbd{background:#f0efe8;border:1px solid #d0cfc8;border-radius:4px;padding:1px 7px;font-family:monospace;font-size:.76rem;color:#666}
     #preview-wrap{margin-top:14px;display:none;position:relative}
     #preview-wrap img{width:100%;border-radius:10px;border:1px solid #e4e4dc;max-height:240px;object-fit:contain;background:#fafaf7;display:block}
     #clear-btn{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.4);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
-    #convert-btn{margin-top:18px;width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity .2s,transform .1s;letter-spacing:.01em}
+    #convert-btn{margin-top:18px;width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity .2s,transform .1s}
     #convert-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
     #convert-btn:disabled{opacity:.4;cursor:not-allowed}
     #progress{display:none;margin-top:18px}
@@ -38,10 +37,8 @@
     .result-info{font-size:.83rem;color:#777;margin-bottom:14px}
     .steps{background:#fff;border-radius:10px;border:1px solid #ddd;padding:13px 16px;margin-bottom:14px;font-size:.84rem;color:#333;line-height:1.85}
     .steps ol{padding-left:17px}
-    .steps kbd{background:#e8eaf6;border:1px solid #9fa8da;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:.78rem;color:#283593}
-    #copy-btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .2s,transform .1s;display:flex;align-items:center;justify-content:center;gap:7px}
-    #copy-btn:hover{background:#283593;transform:translateY(-1px)}
-    #copy-btn.ok{background:#2e7d32}
+    #dl-btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .2s,transform .1s}
+    #dl-btn:hover{background:#283593;transform:translateY(-1px)}
     .tags{margin-top:11px;display:flex;flex-wrap:wrap;gap:5px}
     .tag{background:#e8eaf6;color:#3949ab;border-radius:6px;padding:3px 10px;font-size:.76rem}
     footer{margin-top:28px;font-size:.8rem;color:#bbb;display:flex;align-items:center;gap:5px}
@@ -79,33 +76,28 @@
       <p><strong>Glissez, collez ou importez un screenshot</strong></p>
       <div class="hint"><kbd>Ctrl+V</kbd> pour coller · ou cliquer pour parcourir</div>
     </div>
-
     <div id="preview-wrap">
       <img id="preview" src="" alt="Aperçu">
-      <button id="clear-btn" title="Effacer">×</button>
+      <button id="clear-btn">×</button>
     </div>
-
-    <button id="convert-btn" disabled>Analyser et générer le JSON Balsamiq</button>
-
+    <button id="convert-btn" disabled>Analyser et télécharger le .bmpr</button>
     <div id="progress">
       <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
       <p id="status">Analyse en cours…</p>
     </div>
-
     <div id="error"></div>
-
     <div id="result">
       <div class="result-box">
-        <h3>Prêt à coller dans Balsamiq !</h3>
+        <h3>Fichier .bmpr prêt !</h3>
         <p class="result-info" id="result-info"></p>
         <div class="steps">
           <ol>
-            <li>Cliquez <strong>Copier</strong> ci-dessous</li>
-            <li>Ouvrez Balsamiq et votre wireframe</li>
-            <li>Faites <kbd>Ctrl+V</kbd> — les composants apparaissent ✓</li>
+            <li>Téléchargez le fichier <strong>.bmpr</strong> ci-dessous</li>
+            <li>Dans Balsamiq : <strong>Fichier → Importer</strong> ou double-cliquez le fichier</li>
+            <li>Votre wireframe s'ouvre directement ✓</li>
           </ol>
         </div>
-        <button id="copy-btn">📋 Copier et coller dans Balsamiq</button>
+        <a id="dl-btn" href="#">⬇ Télécharger le fichier .bmpr</a>
         <div class="tags" id="tags"></div>
       </div>
     </div>
@@ -119,14 +111,13 @@
     btn=document.getElementById('convert-btn'),prog=document.getElementById('progress'),
     pbar=document.getElementById('pbar'),stat=document.getElementById('status'),
     res=document.getElementById('result'),err=document.getElementById('error'),
-    cpBtn=document.getElementById('copy-btn'),clrBtn=document.getElementById('clear-btn');
-    let file=null,bmlf=null;
+    dlBtn=document.getElementById('dl-btn'),clrBtn=document.getElementById('clear-btn');
+    let file=null;
 
     fi.onchange=e=>load(e.target.files[0]);
     dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};
     dz.ondragleave=()=>dz.classList.remove('on');
     dz.ondrop=e=>{e.preventDefault();dz.classList.remove('on');load(e.dataTransfer.files[0])};
-
     document.addEventListener('paste',e=>{
       for(const it of(e.clipboardData?.items||[])){
         if(it.type.startsWith('image/')){load(it.getAsFile());break}
@@ -139,17 +130,17 @@
     function load(f){
       if(!f||!f.type.startsWith('image/'))return;
       file=f;prev.src=URL.createObjectURL(f);pw.style.display='block';
-      btn.disabled=false;res.style.display='none';err.style.display='none';bmlf=null;
+      btn.disabled=false;res.style.display='none';err.style.display='none';
     }
     clrBtn.onclick=()=>{
-      file=bmlf=null;prev.src='';pw.style.display='none';
+      file=null;prev.src='';pw.style.display='none';
       btn.disabled=true;res.style.display='none';err.style.display='none';fi.value='';
     };
 
     btn.onclick=async()=>{
       if(!file)return;
       btn.disabled=true;err.style.display='none';res.style.display='none';prog.style.display='block';
-      const steps=[[20,"Chargement…"],[50,"Détection des contours…"],[75,"Classification…"],[92,"Génération BMLF…"]];
+      const steps=[[20,"Chargement…"],[50,"Détection des contours…"],[75,"Classification…"],[92,"Génération .bmpr…"]];
       let si=0;
       const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},500);
       try{
@@ -158,11 +149,11 @@
         const d=await r.json();
         clearInterval(t);
         if(!r.ok)throw new Error(d.detail||'Erreur serveur');
-        bmlf=d.clipboard_bmlf;
         pbar.style.width='100%';stat.textContent='Terminé !';
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';
         document.getElementById('result-info').textContent=`${d.components_count} composants détectés.`;
+        dlBtn.href=d.download_url;
         const tg=document.getElementById('tags');tg.innerHTML='';
         (d.types||[]).forEach(t=>{const s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s)});
         res.style.display='block';
@@ -170,15 +161,6 @@
         clearInterval(t);prog.style.display='none';
         err.textContent=e.message;err.style.display='block';
       }finally{btn.disabled=false}
-    };
-
-    cpBtn.onclick=async()=>{
-      if(!bmlf)return;
-      try{await navigator.clipboard.writeText(bmlf)}
-      catch{const ta=document.createElement('textarea');ta.value=bmlf;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}
-      cpBtn.textContent='✓ Copié ! Faites Ctrl+V dans Balsamiq';
-      cpBtn.classList.add('ok');
-      setTimeout(()=>{cpBtn.innerHTML='📋 Copier et coller dans Balsamiq';cpBtn.classList.remove('ok')},3000);
     };
   </script>
 </body>
