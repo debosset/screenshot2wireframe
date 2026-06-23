@@ -1,25 +1,19 @@
-# Screenshot → Wireframe Balsamiq Clipboard
+# SnapWire — Screenshot vers Clipboard Balsamiq
 
-Version corrigée v5.
+Version v6.
 
-Cette version ne génère pas de BMML et ne génère pas de BMPR.
-Elle génère le JSON `text/plain` compatible avec le copier/coller Balsamiq.
-
-## Correction importante
-
-Le collage échouait avec des typeID risqués comme `NavBar`, `Rectangle`, `SearchBox`, `DataGrid`.
-Cette version force uniquement des composants validés/sûrs :
-
-- `Button`
-- `TextInput`
-- `CheckBox`
-- `RadioButton`
-- `Label`
+- Génère un JSON `text/plain` compatible avec le presse-papier Balsamiq.
+- Ajoute un mode **Tous les composants Balsamiq connus**.
+- Garde un **mode sûr** si certains `typeID` sont refusés par Balsamiq Cloud/Confluence.
 
 ## Utilisation
 
-1. Lancer l'application.
-2. Mettre le Project ID Balsamiq : `2178941824:2178942175` ou celui du projet cible.
-3. Importer/coller un screenshot.
-4. Cliquer sur **Copier pour Balsamiq**.
-5. Coller dans la page Balsamiq existante avec `Ctrl+V`.
+1. Ouvrir Balsamiq et copier un composant existant pour récupérer le `projectID`.
+2. Coller le `projectID` dans SnapWire.
+3. Importer ou coller un screenshot.
+4. Cliquer sur **Analyser le screenshot**.
+5. Cliquer sur **Copier pour Balsamiq** puis `Ctrl+V` dans la page Balsamiq cible.
+
+## Conseil
+
+Si le collage échoue avec le mode complet, sélectionner **Mode sûr testé**.

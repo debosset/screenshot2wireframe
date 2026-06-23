@@ -30,6 +30,7 @@ async def index(request: Request):
 async def convert(
     file: UploadFile = File(...),
     project_id: Optional[str] = Form("0:1"),
+    component_mode: Optional[str] = Form("all"),
 ):
     if file.content_type not in {"image/png", "image/jpeg", "image/webp", "image/gif"}:
         raise HTTPException(400, "Format non supporté.")
@@ -50,9 +51,9 @@ async def convert(
         img_h = max((c["y"] + c["h"]) for c in components)
 
         for c in components:
-            c["typeID"] = classify(c.get("type", "Rectangle"), c["x"], c["y"], c["w"], c["h"], img_w, img_h)
+            c["typeID"] = classify(c.get("type", "Rectangle"), c["x"], c["y"], c["w"], c["h"], img_w, img_h, mode=component_mode or "all")
 
-        clipboard_json = to_clipboard_json(components, project_id=project_id or "0:1")
+        clipboard_json = to_clipboard_json(components, project_id=project_id or "0:1", mode=component_mode or "all")
         CLIPBOARD_CACHE[job_id] = clipboard_json
 
         return {
