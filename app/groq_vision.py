@@ -18,7 +18,9 @@ Rules:
 - Button, Label, CheckBox, RadioButton do NOT have w or h
 - All numeric values must be strings
 - Coordinates based on 1000px wide canvas
-- Return pure JSON only, nothing else"""
+- Return pure JSON only, nothing else
+- Maximum 30 controls, group similar elements
+- Keep it concise"""
 
 VISION_MODELS = ["meta-llama/llama-4-scout-17b-16e-instruct"]
 
@@ -71,7 +73,7 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
                         {"type": "text", "text": PROMPT}
                     ]}],
                     temperature=0.0,
-                    max_tokens=4096,
+                    max_tokens=8192,
                 )
                 raw = response.choices[0].message.content
                 clean = _extract_json(raw)
