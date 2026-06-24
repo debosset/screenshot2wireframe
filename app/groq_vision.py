@@ -4,51 +4,77 @@ from typing import List, Dict, Any
 from groq import Groq
 from PIL import Image
 
-PROMPT = """Analyse ce screenshot d'interface web et génère un wireframe Balsamiq.
-Retourne UNIQUEMENT du JSON valide, sans texte, sans markdown, sans ```.
+PROMPT = """Look at this web interface screenshot and generate a Balsamiq wireframe.
+Return ONLY a valid JSON object, no text before or after, no markdown, no backticks.
 
-Format exact :
-{"controls":[{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Titre"}},{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Nom"}},{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400"}],"mockupW":"1000","mockupH":"800"}
+Use this exact format:
+{"controls":[{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Page title"}},{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Name"}},{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400"},{"ID":"3","typeID":"Button","zOrder":"3","measuredW":"61","measuredH":"27","x":"50","y":"120","properties":{"text":"Submit"}}],"mockupW":"1000","mockupH":"600"}
 
-TypeIDs valides : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, NavBar, Image, Rectangle, HRule
-Règles importantes :
-- Label placé 15px au-dessus du TextInput correspondant
-- TextInput a toujours w (largeur)
-- Button, Label, CheckBox, RadioButton : sans w/h
-- Coordonnées en base 1000px de large, hauteur proportionnelle
-- Tous les champs numériques en string
-- JSON pur uniquement, pas de texte autour"""
+Valid typeID values: Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, NavBar, Image, Rectangle, HRule
+
+Rules:
+- Label y + 15 = TextInput y (label just above its field)
+- TextInput always has w attribute
+- Button, Label, CheckBox, RadioButton do NOT have w or h
+- All numeric values must be strings
+- Coordinates based on 1000px wide canvas
+- Return pure JSON only, nothing else"""
 
 
-def _prepare_image(image_path: str, max_size: int = 1200) -> tuple[str, str]:
-    """Redimensionne l'image si nécessaire et retourne (base64, mime_type)."""
+def _prepare_image(image_path: str, max_size: int = 800) -> tuple:
     img = Image.open(image_path)
-    
-    # Convertir en RGB si nécessaire
     if img.mode in ('RGBA', 'P'):
         img = img.convert('RGB')
-    
-    # Redimensionner si trop grande
     w, h = img.size
     if w > max_size or h > max_size:
         ratio = min(max_size/w, max_size/h)
-        new_w, new_h = int(w*ratio), int(h*ratio)
-        img = img.resize((new_w, new_h), Image.LANCZOS)
-    
-    # Encoder en JPEG (plus léger que PNG)
+        img = img.resize((int(w*ratio), int(h*ratio)), Image.LANCZOS)
     buf = io.BytesIO()
-    img.save(buf, format='JPEG', quality=85, optimize=True)
+    img.save(buf, format='JPEG', quality=80, optimize=True)
     buf.seek(0)
+    return base64.standard_b64encode(buf.read()).decode("utf-8"), "image/jpeg"
+
+
+def _fix_json(raw: str) -> str:
+    """Tente de réparer un JSON partiellement malformé."""
+    # Supprimer texte avant le premier {
+    start = raw.find('{')
+    if start > 0:
+        raw = raw[start:]
     
-    b64 = base64.standard_b64encode(buf.read()).decode("utf-8")
-    return b64, "image/jpeg"
+    # Trouver la fin du JSON en comptant les accolades
+    depth = 0
+    end = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(raw):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if not in_string:
+            if ch == '{': depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+    
+    if end > 0:
+        raw = raw[:end]
+    
+    return raw.strip()
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
     b64, mime = _prepare_image(image_path)
-    
     client = Groq(api_key=api_key)
-    
+
     response = client.chat.completions.create(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[{
@@ -63,18 +89,22 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     )
 
     raw = response.choices[0].message.content.strip()
-    
-    # Nettoyer markdown
+
+    # Log pour debug
+    import logging
+    logging.warning(f"GROQ RAW RESPONSE (first 500 chars): {raw[:500]}")
+
+    # Nettoyer
     raw = re.sub(r'```json\s*', '', raw)
     raw = re.sub(r'```\s*', '', raw)
-    raw = raw.strip()
-    
-    # Extraire le JSON
-    m = re.search(r'\{.*\}', raw, re.DOTALL)
-    if m:
-        raw = m.group(0)
+    raw = _fix_json(raw)
 
-    parsed = json.loads(raw)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON parse error: {e}\nRaw: {raw[:1000]}")
+        raise ValueError(f"Groq a retourné un JSON invalide. Réessayez avec une image plus simple. Détail: {e}")
+
     controls = parsed.get("controls", [])
     mockup_w = str(parsed.get("mockupW", "1000"))
     mockup_h = str(parsed.get("mockupH", "800"))
