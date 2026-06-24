@@ -1,19 +1,31 @@
 """
-Génère un .bmpr valide — schéma et format confirmés fonctionnels.
-Règle clé : w/h optionnels selon le type — certains composants utilisent uniquement measuredW/H.
+Génère un .bmpr valide — règles w/h confirmées depuis vrais fichiers Balsamiq :
+- Conteneurs (BrowserWindow, Canvas, Rectangle, FieldSet...) : w=✓ h=✓
+- La plupart des composants : w=✓ h=✗ (seulement la largeur)
+- Textes/Labels/Boutons simples : w=✗ h=✗
 """
 import json, sqlite3, uuid, os
 from typing import List, Dict, Any
 
-# Composants qui N'ont PAS besoin de w/h explicites (Balsamiq utilise measuredW/H)
-NO_WH_TYPES = {
-    "Title", "SubTitle", "Label", "Paragraph", "Link", "Text",
-    "Button", "CheckBox", "RadioButton", "ComboBox", "DatePicker",
-    "NumericStepper", "Slider", "Toggle", "Switch", "ProgressBar",
-    "Icon", "CallOut", "Tooltip", "StickyNote", "Comment",
-    "HRule", "VRule", "Arrow", "BreadCrumb", "Pagination",
-    "Rating", "ColorPicker", "PointyButton", "RoundButton",
+# Composants avec w ET h
+WH_TYPES = {
+    "BrowserWindow", "Canvas", "Rectangle", "RoundedRectangle",
+    "FieldSet", "Container", "Panel", "Modal", "Image",
+    "TextArea", "DataGrid", "Table", "Chart", "Map",
+    "VideoPlayer", "TabBar", "Accordion", "TreePane",
+    "SiteMap", "Phone", "Tablet", "iPad", "Window",
+    "List", "ColumnList", "MultiColumnList",
 }
+
+# Composants avec seulement w (pas h)
+W_ONLY_TYPES = {
+    "TextInput", "HRule", "RoundButton", "NavBar",
+    "SearchBox", "ComboBox", "Slider", "ProgressBar",
+    "ButtonBar", "Pagination", "BreadCrumb", "TagInput",
+}
+
+# Tous les autres : ni w ni h (Title, Label, Button, CheckBox, etc.)
+
 
 def build_bmpr(components: List[Dict[str, Any]], output_path: str, project_name: str = "Wireframe") -> None:
     if os.path.exists(output_path):
@@ -34,10 +46,11 @@ def build_bmpr(components: List[Dict[str, Any]], output_path: str, project_name:
             "x": str(c["x"]),
             "y": str(c["y"]),
         }
-        # Ajouter w/h seulement pour les composants qui en ont besoin
-        if tid not in NO_WH_TYPES:
+        if tid in WH_TYPES:
             ctrl["w"] = str(c["w"])
             ctrl["h"] = str(c["h"])
+        elif tid in W_ONLY_TYPES:
+            ctrl["w"] = str(c["w"])
 
         controls.append(ctrl)
 
