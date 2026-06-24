@@ -13,20 +13,21 @@
     .brand span{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .tagline{font-size:.88rem;color:#888}
     .card{background:#fff;border-radius:20px;border:1px solid #e4e4dc;padding:24px;width:100%;max-width:620px;box-shadow:0 2px 24px rgba(0,0,0,.07);margin-bottom:14px}
-    .card-title{font-size:.75rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .card-title{font-size:.75rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
     .step-badge{background:#e8eaf6;color:#3949ab;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
     .row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-    .row label{font-size:.8rem;color:#777;font-weight:500}
-    .row input{padding:9px 12px;border:1px solid #d0cfc8;border-radius:8px;font-size:.85rem;color:#333;background:#fafaf7;outline:none;transition:border-color .2s;font-family:monospace}
+    .row label{font-size:.8rem;color:#777;font-weight:500;display:flex;align-items:center;justify-content:space-between}
+    .row input{padding:9px 12px;border:1px solid #d0cfc8;border-radius:8px;font-size:.85rem;color:#333;background:#fafaf7;outline:none;transition:border-color .2s}
     .row input:focus{border-color:#667eea}
     .row .sub{font-size:.73rem;color:#bbb}
-    /* Mode toggle */
-    .mode-toggle{display:flex;gap:8px;margin-bottom:18px}
-    .mode-btn{flex:1;padding:10px;border:1.5px solid #e0e0e0;border-radius:10px;background:#fafaf7;cursor:pointer;font-size:.85rem;font-weight:500;color:#666;transition:all .2s;text-align:center}
-    .mode-btn.active{border-color:#667eea;background:#f0f0ff;color:#3f51b5;font-weight:600}
-    .groq-section{display:none;background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:14px;margin-bottom:16px}
-    .groq-section.visible{display:block}
-    .groq-badge{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600;color:#059669;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:2px 8px;margin-bottom:8px}
+    /* Clé API */
+    .api-key-wrap{position:relative}
+    .api-key-wrap input{padding-right:80px;font-family:monospace}
+    .api-key-status{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.72rem;font-weight:600;border-radius:5px;padding:2px 8px}
+    .api-key-status.saved{background:#ecfdf5;color:#059669}
+    .api-key-status.unsaved{background:#fef3c7;color:#d97706}
+    .save-btn{background:none;border:none;cursor:pointer;font-size:.78rem;color:#667eea;font-weight:600;padding:0;text-decoration:underline}
+    .save-btn:hover{color:#3f51b5}
     /* Dropzone */
     #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
     #dropzone.on{border-color:#667eea;background:#f0f0ff}
@@ -51,9 +52,7 @@
     /* Analysis */
     #analysis-card{display:none}
     .source-info{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-    .src-badge{font-size:.74rem;font-weight:600;border-radius:6px;padding:3px 9px}
-    .src-groq{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
-    .src-ocr{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
+    .src-badge{font-size:.74rem;font-weight:600;border-radius:6px;padding:3px 9px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
     .components-list{background:#fafaf7;border:1px solid #e4e4dc;border-radius:10px;padding:10px;max-height:300px;overflow-y:auto}
     .comp-item{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:7px;margin-bottom:2px;border:1px solid transparent;transition:background .15s}
     .comp-item:hover{background:#f0f0ff;border-color:#e8eaf6}
@@ -96,35 +95,34 @@
       </svg>
     </div>
     <div class="brand">Snap<span>Wire</span></div>
-    <p class="tagline">Screenshot → Wireframe Balsamiq en un clic</p>
+    <p class="tagline">Screenshot → Wireframe Balsamiq · propulsé par Groq IA</p>
   </div>
 
   <!-- Étape 1 -->
   <div class="card">
-    <div class="card-title"><span class="step-badge">1</span> Importer le screenshot</div>
+    <div class="card-title"><span class="step-badge">1</span> Configuration</div>
 
-    <p class="row" style="margin-bottom:10px">
-      <span style="font-size:.8rem;color:#777;font-weight:500">Mode d'analyse</span>
-    </p>
-    <div class="mode-toggle">
-      <div class="mode-btn active" id="mode-ocr" onclick="setMode('ocr')">⚡ OCR gratuit</div>
-      <div class="mode-btn" id="mode-groq" onclick="setMode('groq')">🤖 Groq IA <span style="font-size:.75rem;font-weight:400;color:#059669">gratuit</span></div>
-    </div>
-
-    <div class="groq-section" id="groq-section">
-      <div class="groq-badge">🤖 Groq Vision — Gratuit 30 req/min</div>
-      <div class="row">
-        <label>Clé API Groq</label>
-        <input type="password" id="groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false">
-        <span class="sub">Gratuit sur <strong>console.groq.com</strong> → API Keys</span>
-      </div>
-    </div>
-
+    <!-- Clé Groq -->
     <div class="row">
-      <label>Project ID Balsamiq <span style="font-weight:400;color:#ccc">(optionnel)</span></label>
+      <label>
+        Clé API Groq
+        <button class="save-btn" id="save-btn" onclick="saveKey()">💾 Sauvegarder</button>
+      </label>
+      <div class="api-key-wrap">
+        <input type="password" id="groq-key" placeholder="gsk_..." autocomplete="off" spellcheck="false" oninput="onKeyChange()">
+        <span class="api-key-status" id="key-status"></span>
+      </div>
+      <span class="sub">Gratuit sur <strong>console.groq.com</strong> → API Keys · <span id="saved-hint"></span></span>
+    </div>
+
+    <!-- Project ID -->
+    <div class="row">
+      <label>Project ID Balsamiq <span style="font-weight:400;color:#ccc;font-size:.75rem">(optionnel)</span></label>
       <input type="text" id="pid" placeholder="ex: 2178941824:2178942175" spellcheck="false">
       <span class="sub">Visible dans l'URL de votre projet Balsamiq</span>
     </div>
+
+    <div class="card-title" style="margin-top:6px"><span class="step-badge">2</span> Screenshot</div>
 
     <div id="dropzone">
       <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp">
@@ -136,7 +134,9 @@
       <img id="preview" src="" alt="">
       <button id="clear-btn">×</button>
     </div>
-    <button id="analyze-btn" class="big-btn btn-analyze" disabled>Analyser le screenshot</button>
+
+    <button id="analyze-btn" class="big-btn btn-analyze" disabled>🤖 Analyser avec Groq IA</button>
+
     <div id="progress">
       <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
       <p id="status">Analyse en cours…</p>
@@ -144,11 +144,11 @@
     <div id="error"></div>
   </div>
 
-  <!-- Étape 2 : Résultat -->
+  <!-- Étape 3 : Résultat analyse -->
   <div class="card" id="analysis-card">
-    <div class="card-title"><span class="step-badge">2</span> Composants détectés</div>
+    <div class="card-title"><span class="step-badge">3</span> Composants détectés — vérifiez</div>
     <div class="source-info">
-      <span class="src-badge" id="src-badge"></span>
+      <span class="src-badge">🤖 Groq IA — llama-4-scout</span>
       <span id="count-info" style="font-size:.82rem;color:#777"></span>
     </div>
     <div class="summary" id="summary"></div>
@@ -156,9 +156,9 @@
     <button id="generate-btn" class="big-btn btn-generate">⬇ Générer le fichier Balsamiq</button>
   </div>
 
-  <!-- Étape 3 : Téléchargement -->
+  <!-- Étape 4 : Téléchargement -->
   <div class="card" id="generate-card">
-    <div class="card-title"><span class="step-badge">3</span> Fichier prêt</div>
+    <div class="card-title"><span class="step-badge">4</span> Fichier prêt</div>
     <div class="action-row">
       <a id="dl-bmpr" class="action-btn btn-dl" href="#">📁 Télécharger .bmpr</a>
       <button id="copy-btn" class="action-btn btn-cp">📋 Copier JSON</button>
@@ -169,17 +169,49 @@
   <footer>Fait avec <span class="heart">♥</span> par <a href="https://github.com/debosset" target="_blank">Adrien de Bosset</a></footer>
 
   <script>
-    let mode='ocr', file=null, jobId=null, clipJson=null;
+    const STORAGE_KEY = 'snapwire_groq_key';
+    let file=null, jobId=null, clipJson=null;
 
-    function setMode(m){
-      mode=m;
-      document.getElementById('mode-ocr').classList.toggle('active',m==='ocr');
-      document.getElementById('mode-groq').classList.toggle('active',m==='groq');
-      document.getElementById('groq-section').classList.toggle('visible',m==='groq');
-      document.getElementById('analyze-btn').textContent = m==='groq'
-        ? '🤖 Analyser avec Groq IA' : '⚡ Analyser le screenshot';
+    // ── Gestion clé API ──────────────────────────────────────────────────────
+    function loadSavedKey(){
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if(saved){
+        document.getElementById('groq-key').value = saved;
+        setKeyStatus('saved');
+        document.getElementById('saved-hint').textContent = 'Clé sauvegardée ✓';
+      }
     }
 
+    function saveKey(){
+      const key = document.getElementById('groq-key').value.trim();
+      if(!key){ alert('Entrez d\'abord votre clé API Groq'); return; }
+      localStorage.setItem(STORAGE_KEY, key);
+      setKeyStatus('saved');
+      document.getElementById('saved-hint').textContent = 'Clé sauvegardée ✓';
+      document.getElementById('save-btn').textContent = '✓ Sauvegardée';
+      setTimeout(()=>{ document.getElementById('save-btn').textContent = '💾 Sauvegarder'; }, 2000);
+    }
+
+    function onKeyChange(){
+      const key = document.getElementById('groq-key').value.trim();
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if(key && key !== saved) setKeyStatus('unsaved');
+      else if(key && key === saved) setKeyStatus('saved');
+      else setKeyStatus('');
+    }
+
+    function setKeyStatus(status){
+      const el = document.getElementById('key-status');
+      if(status === 'saved'){ el.textContent='Sauvegardée'; el.className='api-key-status saved'; }
+      else if(status === 'unsaved'){ el.textContent='Non sauvegardée'; el.className='api-key-status unsaved'; }
+      else { el.textContent=''; el.className='api-key-status'; }
+    }
+
+    function getKey(){
+      return document.getElementById('groq-key').value.trim() || localStorage.getItem(STORAGE_KEY) || '';
+    }
+
+    // ── Upload ───────────────────────────────────────────────────────────────
     const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),
     prev=document.getElementById('preview'),pw=document.getElementById('preview-wrap'),
     analyzeBtn=document.getElementById('analyze-btn'),generateBtn=document.getElementById('generate-btn'),
@@ -206,6 +238,7 @@
       document.getElementById('analysis-card').style.display='none';
       document.getElementById('generate-card').style.display='none';
     }
+
     clrBtn.onclick=()=>{
       file=null; prev.src=''; pw.style.display='none'; analyzeBtn.disabled=true;
       document.getElementById('analysis-card').style.display='none';
@@ -213,53 +246,46 @@
       err.style.display='none'; fi.value='';
     };
 
+    // ── Analyser ─────────────────────────────────────────────────────────────
     analyzeBtn.onclick=async()=>{
-      if(!file)return;
-      if(mode==='groq'&&!document.getElementById('groq-key').value.trim()){
-        err.textContent='Entrez votre clé API Groq (gratuite sur console.groq.com)';
-        err.style.display='block'; return;
-      }
+      const key = getKey();
+      if(!key){ err.textContent='Entrez votre clé API Groq (gratuite sur console.groq.com)'; err.style.display='block'; return; }
+      if(!file) return;
+
       analyzeBtn.disabled=true; err.style.display='none';
       document.getElementById('analysis-card').style.display='none';
       prog.style.display='block';
 
-      const steps = mode==='groq'
-        ? [[15,"Envoi à Groq IA…"],[40,"Analyse de l'interface…"],[70,"Détection des composants…"],[90,"Finalisation…"]]
-        : [[20,"Chargement…"],[50,"OCR…"],[75,"Détection…"],[92,"Finalisation…"]];
+      const steps=[[15,"Envoi à Groq IA…"],[40,"Analyse de l'interface…"],[70,"Détection des composants…"],[90,"Finalisation…"]];
       let si=0;
-      const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},mode==='groq'?1500:500);
+      const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},1500);
 
       try{
         const fd=new FormData();
         fd.append('file',file);
-        fd.append('project_id',document.getElementById('pid').value.trim()||'0:1');
-        if(mode==='groq') fd.append('groq_api_key',document.getElementById('groq-key').value.trim());
+        fd.append('groq_api_key', key);
+        fd.append('project_id', document.getElementById('pid').value.trim()||'0:1');
         const r=await fetch('/analyze',{method:'POST',body:fd});
         const d=await r.json();
         clearInterval(t);
-        if(!r.ok)throw new Error(d.detail||'Erreur serveur');
+        if(!r.ok) throw new Error(d.detail||'Erreur serveur');
         jobId=d.job_id;
-        pbar.style.width='100%'; stat.textContent='Terminé !';
+        pbar.style.width='100%'; stat.textContent='Analyse terminée !';
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';
-        renderAnalysis(d.components, d.components_count, d.source);
+        renderAnalysis(d.components, d.components_count);
       }catch(e){
         clearInterval(t); prog.style.display='none';
         err.textContent=e.message; err.style.display='block';
-      }finally{analyzeBtn.disabled=false}
+      }finally{ analyzeBtn.disabled=false; }
     };
 
-    function renderAnalysis(components, count, source){
-      const badge=document.getElementById('src-badge');
-      if(source==='groq'){badge.textContent='🤖 Groq IA';badge.className='src-badge src-groq';}
-      else{badge.textContent='⚡ OCR';badge.className='src-badge src-ocr';}
+    function renderAnalysis(components, count){
       document.getElementById('count-info').textContent=`${count} composants détectés`;
-
       const counts={};
       components.forEach(c=>{counts[c.typeID]=(counts[c.typeID]||0)+1});
       document.getElementById('summary').innerHTML=Object.entries(counts)
         .sort((a,b)=>b[1]-a[1]).map(([t,n])=>`<span class="sum-chip">${t} ×${n}</span>`).join('');
-
       document.getElementById('components-list').innerHTML=components.map(c=>`
         <div class="comp-item">
           <span class="comp-emoji">${(c.label||'▭').split(' ')[0]}</span>
@@ -269,13 +295,13 @@
           </div>
           <span class="comp-badge">${c.typeID}</span>
         </div>`).join('');
-
       document.getElementById('analysis-card').style.display='block';
       document.getElementById('analysis-card').scrollIntoView({behavior:'smooth',block:'start'});
     }
 
+    // ── Générer ───────────────────────────────────────────────────────────────
     generateBtn.onclick=async()=>{
-      if(!jobId)return;
+      if(!jobId) return;
       generateBtn.disabled=true; generateBtn.textContent='Génération…';
       try{
         const fd=new FormData();
@@ -283,22 +309,27 @@
         fd.append('project_id',document.getElementById('pid').value.trim()||'0:1');
         const r=await fetch('/generate',{method:'POST',body:fd});
         const d=await r.json();
-        if(!r.ok)throw new Error(d.detail||'Erreur');
+        if(!r.ok) throw new Error(d.detail||'Erreur');
         clipJson=d.clipboard_json;
         dlBmpr.href=d.bmpr_url; dlJson.href=d.download_url;
         document.getElementById('generate-card').style.display='block';
         document.getElementById('generate-card').scrollIntoView({behavior:'smooth',block:'start'});
-      }catch(e){err.textContent=e.message;err.style.display='block';}
-      finally{generateBtn.disabled=false;generateBtn.textContent='⬇ Générer le fichier Balsamiq'}
+      }catch(e){
+        err.textContent=e.message; err.style.display='block';
+      }finally{ generateBtn.disabled=false; generateBtn.textContent='⬇ Générer le fichier Balsamiq'; }
     };
 
+    // ── Copier JSON ───────────────────────────────────────────────────────────
     copyBtn.onclick=async()=>{
-      if(!clipJson)return;
-      try{await navigator.clipboard.writeText(clipJson)}
-      catch{const ta=document.createElement('textarea');ta.value=clipJson;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}
-      copyBtn.textContent='✓ Copié !';copyBtn.classList.add('ok');
-      setTimeout(()=>{copyBtn.textContent='📋 Copier JSON';copyBtn.classList.remove('ok')},2500);
+      if(!clipJson) return;
+      try{ await navigator.clipboard.writeText(clipJson); }
+      catch{ const ta=document.createElement('textarea');ta.value=clipJson;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta); }
+      copyBtn.textContent='✓ Copié !'; copyBtn.classList.add('ok');
+      setTimeout(()=>{ copyBtn.textContent='📋 Copier JSON'; copyBtn.classList.remove('ok'); }, 2500);
     };
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    loadSavedKey();
   </script>
 </body>
 </html>
