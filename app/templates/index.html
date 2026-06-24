@@ -231,8 +231,8 @@
         <div class="comp-item">
           <span class="comp-emoji">${c.label.split(' ')[0]}</span>
           <div class="comp-info">
-            <div class="comp-type">${c.label.substring(c.label.indexOf(' ')+1)}</div>
-            <div class="comp-pos">x:${c.x} y:${c.y} — ${c.w}×${c.h}px</div>
+            <div class="comp-type">${c.description ? `"${c.description}"` : c.label.substring(c.label.indexOf(' ')+1)}</div>
+            <div class="comp-pos">${c.label.substring(c.label.indexOf(' ')+1)} — x:${c.x} y:${c.y} ${c.w}×${c.h}px</div>
           </div>
           <span class="comp-badge">${c.typeID}</span>
         </div>
