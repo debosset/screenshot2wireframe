@@ -1,7 +1,7 @@
-import base64, json, re, uuid, io
+import base64, json, re, uuid, io, time
 from pathlib import Path
 from typing import List, Dict, Any
-from groq import Groq
+from groq import Groq, InternalServerError, RateLimitError
 from PIL import Image
 
 PROMPT = """Look at this web interface screenshot and generate a Balsamiq wireframe.
@@ -20,6 +20,14 @@ Rules:
 - Coordinates based on 1000px wide canvas
 - Return pure JSON only, nothing else"""
 
+# Modèles vision disponibles sur Groq, par ordre de préférence
+VISION_MODELS = [
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision-preview",
+]
+
 
 def _prepare_image(image_path: str, max_size: int = 800) -> tuple:
     img = Image.open(image_path)
@@ -36,94 +44,76 @@ def _prepare_image(image_path: str, max_size: int = 800) -> tuple:
 
 
 def _fix_json(raw: str) -> str:
-    """Tente de réparer un JSON partiellement malformé."""
-    # Supprimer texte avant le premier {
     start = raw.find('{')
     if start > 0:
         raw = raw[start:]
-    
-    # Trouver la fin du JSON en comptant les accolades
-    depth = 0
-    end = 0
-    in_string = False
-    escape = False
+    depth, end, in_str, esc = 0, 0, False, False
     for i, ch in enumerate(raw):
-        if escape:
-            escape = False
-            continue
-        if ch == '\\' and in_string:
-            escape = True
-            continue
-        if ch == '"' and not escape:
-            in_string = not in_string
-            continue
-        if not in_string:
+        if esc: esc = False; continue
+        if ch == '\\' and in_str: esc = True; continue
+        if ch == '"': in_str = not in_str; continue
+        if not in_str:
             if ch == '{': depth += 1
             elif ch == '}':
                 depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-    
-    if end > 0:
-        raw = raw[:end]
-    
-    return raw.strip()
+                if depth == 0: end = i + 1; break
+    return raw[:end].strip() if end else raw.strip()
+
+
+def _call_groq(client, model, b64, mime):
+    return client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+            {"type": "text", "text": PROMPT}
+        ]}],
+        temperature=0.0,
+        max_tokens=4096,
+    )
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
     b64, mime = _prepare_image(image_path)
     client = Groq(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                {"type": "text", "text": PROMPT}
-            ]
-        }],
-        temperature=0.0,
-        max_tokens=4096,
-    )
+    last_error = None
+    for model in VISION_MODELS:
+        for attempt in range(2):  # 2 tentatives par modèle
+            try:
+                response = _call_groq(client, model, b64, mime)
+                raw = response.choices[0].message.content.strip()
+                raw = re.sub(r'```json\s*', '', raw)
+                raw = re.sub(r'```\s*', '', raw)
+                raw = _fix_json(raw)
+                parsed = json.loads(raw)
+                controls = parsed.get("controls", [])
+                mockup_w = str(parsed.get("mockupW", "1000"))
+                mockup_h = str(parsed.get("mockupH", "800"))
+                return {
+                    "mockup": {
+                        "controls": {"control": controls},
+                        "attributes": {"name": "New Wireframe 1", "order": 938428.5264654435, "parentID": None, "notes": None},
+                        "branchID": "Master",
+                        "resourceID": str(uuid.uuid4()).upper(),
+                        "mockupH": mockup_h, "mockupW": mockup_w,
+                        "measuredW": mockup_w, "measuredH": mockup_h,
+                        "version": "1.0",
+                        "calloutsOffset": {"x": 0, "y": 0},
+                    },
+                    "groupOffset": {"x": 0, "y": 0},
+                    "dependencies": [],
+                    "projectID": project_id,
+                }
+            except (InternalServerError, RateLimitError) as e:
+                last_error = e
+                wait = 3 * (attempt + 1)
+                time.sleep(wait)
+                continue
+            except Exception as e:
+                last_error = e
+                break  # Essayer le modèle suivant
 
-    raw = response.choices[0].message.content.strip()
-
-    # Log pour debug
-    import logging
-    logging.warning(f"GROQ RAW RESPONSE (first 500 chars): {raw[:500]}")
-
-    # Nettoyer
-    raw = re.sub(r'```json\s*', '', raw)
-    raw = re.sub(r'```\s*', '', raw)
-    raw = _fix_json(raw)
-
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON parse error: {e}\nRaw: {raw[:1000]}")
-        raise ValueError(f"Groq a retourné un JSON invalide. Réessayez avec une image plus simple. Détail: {e}")
-
-    controls = parsed.get("controls", [])
-    mockup_w = str(parsed.get("mockupW", "1000"))
-    mockup_h = str(parsed.get("mockupH", "800"))
-
-    return {
-        "mockup": {
-            "controls": {"control": controls},
-            "attributes": {"name": "New Wireframe 1", "order": 938428.5264654435, "parentID": None, "notes": None},
-            "branchID": "Master",
-            "resourceID": str(uuid.uuid4()).upper(),
-            "mockupH": mockup_h, "mockupW": mockup_w,
-            "measuredW": mockup_w, "measuredH": mockup_h,
-            "version": "1.0",
-            "calloutsOffset": {"x": 0, "y": 0},
-        },
-        "groupOffset": {"x": 0, "y": 0},
-        "dependencies": [],
-        "projectID": project_id,
-    }
+    raise ValueError(f"Tous les modèles Groq sont indisponibles. Réessayez dans quelques secondes. ({last_error})")
 
 
 def extract_components(mockup_json: Dict) -> List[Dict]:
