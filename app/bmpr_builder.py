@@ -1,30 +1,25 @@
 """
-Génère un .bmpr valide — règles w/h confirmées depuis vrais fichiers Balsamiq :
-- Conteneurs (BrowserWindow, Canvas, Rectangle, FieldSet...) : w=✓ h=✓
-- La plupart des composants : w=✓ h=✗ (seulement la largeur)
-- Textes/Labels/Boutons simples : w=✗ h=✗
+Génère un .bmpr valide — schéma et règles confirmés depuis vrais fichiers Balsamiq.
+Règle w/h : on met w ET h si la taille réelle diffère des mesuredW/H par défaut.
 """
 import json, sqlite3, uuid, os
 from typing import List, Dict, Any
 
-# Composants avec w ET h
-WH_TYPES = {
-    "BrowserWindow", "Canvas", "Rectangle", "RoundedRectangle",
-    "FieldSet", "Container", "Panel", "Modal", "Image",
-    "TextArea", "DataGrid", "Table", "Chart", "Map",
-    "VideoPlayer", "TabBar", "Accordion", "TreePane",
-    "SiteMap", "Phone", "Tablet", "iPad", "Window",
-    "List", "ColumnList", "MultiColumnList",
+# Tailles par défaut Balsamiq par typeID
+MEASURED_DEFAULTS = {
+    "Button": (61, 27), "PointyButton": (124, 27), "RoundButton": (32, 32),
+    "ButtonBar": (159, 27), "CheckBox": (78, 23), "RadioButton": (97, 23),
+    "TextInput": (79, 27), "TextArea": (200, 100), "ComboBox": (120, 27),
+    "SearchBox": (200, 27), "TagInput": (200, 27), "Slider": (150, 20),
+    "NumericStepper": (90, 27), "DatePicker": (120, 27), "Toggle": (54, 23),
+    "Label": (100, 17), "Title": (200, 30), "SubTitle": (180, 24),
+    "Paragraph": (300, 80), "Link": (60, 17), "HRule": (100, 10),
+    "NavBar": (300, 30), "TabBar": (300, 42), "BreadCrumb": (250, 20),
+    "Pagination": (200, 30), "Icon": (32, 32), "CallOut": (39, 39),
+    "Image": (200, 150), "Rectangle": (200, 150), "Canvas": (100, 70),
+    "FieldSet": (300, 200), "DataGrid": (300, 150), "Table": (300, 120),
+    "ProgressBar": (200, 20), "Rating": (100, 20),
 }
-
-# Composants avec seulement w (pas h)
-W_ONLY_TYPES = {
-    "TextInput", "HRule", "RoundButton", "NavBar",
-    "SearchBox", "ComboBox", "Slider", "ProgressBar",
-    "ButtonBar", "Pagination", "BreadCrumb", "TagInput",
-}
-
-# Tous les autres : ni w ni h (Title, Label, Button, CheckBox, etc.)
 
 
 def build_bmpr(components: List[Dict[str, Any]], output_path: str, project_name: str = "Wireframe") -> None:
@@ -37,20 +32,23 @@ def build_bmpr(components: List[Dict[str, Any]], output_path: str, project_name:
     controls = []
     for i, c in enumerate(components):
         tid = c.get("typeID", c.get("type", "Rectangle"))
+        w, h = int(c["w"]), int(c["h"])
+        def_w, def_h = MEASURED_DEFAULTS.get(tid, (w, h))
+
         ctrl = {
             "ID": str(i + 1),
             "typeID": tid,
             "zOrder": str(i),
-            "measuredW": str(c.get("measuredW", c["w"])),
-            "measuredH": str(c.get("measuredH", c["h"])),
+            "measuredW": str(def_w),
+            "measuredH": str(def_h),
             "x": str(c["x"]),
             "y": str(c["y"]),
         }
-        if tid in WH_TYPES:
-            ctrl["w"] = str(c["w"])
-            ctrl["h"] = str(c["h"])
-        elif tid in W_ONLY_TYPES:
-            ctrl["w"] = str(c["w"])
+
+        # Mettre w/h si la taille réelle est différente des valeurs par défaut
+        if w != def_w or h != def_h:
+            ctrl["w"] = str(w)
+            ctrl["h"] = str(h)
 
         controls.append(ctrl)
 
