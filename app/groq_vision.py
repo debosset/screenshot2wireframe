@@ -1,26 +1,54 @@
-import base64, json, re, uuid
+import base64, json, re, uuid, io
 from pathlib import Path
 from typing import List, Dict, Any
 from groq import Groq
+from PIL import Image
 
 PROMPT = """Analyse ce screenshot d'interface web et génère un wireframe Balsamiq.
 Retourne UNIQUEMENT du JSON valide, sans texte, sans markdown, sans ```.
 
-Format :
+Format exact :
 {"controls":[{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Titre"}},{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Nom"}},{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400"}],"mockupW":"1000","mockupH":"800"}
 
-TypeIDs : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, NavBar, Image, Rectangle, HRule
-Règles : Label 15px au-dessus du TextInput. TextInput a w. Button/Label/CheckBox/RadioButton sans w/h. Coords base 1000px. IDs en string. JSON pur uniquement."""
+TypeIDs valides : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, NavBar, Image, Rectangle, HRule
+Règles importantes :
+- Label placé 15px au-dessus du TextInput correspondant
+- TextInput a toujours w (largeur)
+- Button, Label, CheckBox, RadioButton : sans w/h
+- Coordonnées en base 1000px de large, hauteur proportionnelle
+- Tous les champs numériques en string
+- JSON pur uniquement, pas de texte autour"""
+
+
+def _prepare_image(image_path: str, max_size: int = 1200) -> tuple[str, str]:
+    """Redimensionne l'image si nécessaire et retourne (base64, mime_type)."""
+    img = Image.open(image_path)
+    
+    # Convertir en RGB si nécessaire
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    
+    # Redimensionner si trop grande
+    w, h = img.size
+    if w > max_size or h > max_size:
+        ratio = min(max_size/w, max_size/h)
+        new_w, new_h = int(w*ratio), int(h*ratio)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+    
+    # Encoder en JPEG (plus léger que PNG)
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85, optimize=True)
+    buf.seek(0)
+    
+    b64 = base64.standard_b64encode(buf.read()).decode("utf-8")
+    return b64, "image/jpeg"
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
-    img_bytes = Path(image_path).read_bytes()
-    b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
-    suffix = Path(image_path).suffix.lower()
-    mime = {".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}.get(suffix,"image/png")
-
+    b64, mime = _prepare_image(image_path)
+    
     client = Groq(api_key=api_key)
-
+    
     response = client.chat.completions.create(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[{
@@ -35,12 +63,13 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     )
 
     raw = response.choices[0].message.content.strip()
-    raw = re.sub(r'^```json\s*', '', raw, flags=re.MULTILINE)
-    raw = re.sub(r'^```\s*', '', raw, flags=re.MULTILINE)
-    raw = re.sub(r'```\s*$', '', raw, flags=re.MULTILINE)
+    
+    # Nettoyer markdown
+    raw = re.sub(r'```json\s*', '', raw)
+    raw = re.sub(r'```\s*', '', raw)
     raw = raw.strip()
-
-    # Extraire le JSON si texte autour
+    
+    # Extraire le JSON
     m = re.search(r'\{.*\}', raw, re.DOTALL)
     if m:
         raw = m.group(0)
@@ -69,12 +98,12 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
 
 def extract_components(mockup_json: Dict) -> List[Dict]:
     TYPE_LABELS = {
-        "Title":"🔤 Titre","SubTitle":"🔤 Sous-titre","Label":"🏷️ Label",
-        "Link":"🔗 Lien","TextInput":"✏️ Champ texte","TextArea":"📄 Zone texte",
-        "Button":"🔘 Bouton","ButtonBar":"🔘 Barre boutons",
-        "CheckBox":"☑️ Case à cocher","RadioButton":"🔘 Radio",
-        "NavBar":"🧭 Navigation","Image":"🖼️ Image",
-        "Rectangle":"▭ Rectangle","HRule":"— Séparateur",
+        "Title":"🔤 Titre", "SubTitle":"🔤 Sous-titre", "Label":"🏷️ Label",
+        "Link":"🔗 Lien", "TextInput":"✏️ Champ texte", "TextArea":"📄 Zone texte",
+        "Button":"🔘 Bouton", "ButtonBar":"🔘 Barre boutons",
+        "CheckBox":"☑️ Case à cocher", "RadioButton":"🔘 Radio",
+        "NavBar":"🧭 Navigation", "Image":"🖼️ Image",
+        "Rectangle":"▭ Rectangle", "HRule":"— Séparateur",
     }
     controls = mockup_json.get("mockup",{}).get("controls",{}).get("control",[])
     result = []
