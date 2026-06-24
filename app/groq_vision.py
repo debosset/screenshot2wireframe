@@ -20,11 +20,7 @@ Rules:
 - Coordinates based on 1000px wide canvas
 - Return pure JSON only, nothing else"""
 
-# Modèles vision disponibles sur Groq, par ordre de préférence
-# Seul modèle vision actif sur Groq (juin 2026)
-VISION_MODELS = [
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-]
+VISION_MODELS = ["meta-llama/llama-4-scout-17b-16e-instruct"]
 
 
 def _prepare_image(image_path: str, max_size: int = 800) -> tuple:
@@ -41,33 +37,23 @@ def _prepare_image(image_path: str, max_size: int = 800) -> tuple:
     return base64.standard_b64encode(buf.read()).decode("utf-8"), "image/jpeg"
 
 
-def _fix_json(raw: str) -> str:
+def _extract_json(raw: str) -> str:
+    """Extrait le JSON d'une réponse qui peut contenir des backticks markdown."""
+    # Supprimer les blocs markdown ```json ... ``` ou ``` ... ```
+    raw = raw.strip()
+    
+    # Pattern 1: ```json\n{...}\n```
+    m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    
+    # Pattern 2: trouver le premier { et le dernier }
     start = raw.find('{')
-    if start > 0:
-        raw = raw[start:]
-    depth, end, in_str, esc = 0, 0, False, False
-    for i, ch in enumerate(raw):
-        if esc: esc = False; continue
-        if ch == '\\' and in_str: esc = True; continue
-        if ch == '"': in_str = not in_str; continue
-        if not in_str:
-            if ch == '{': depth += 1
-            elif ch == '}':
-                depth -= 1
-                if depth == 0: end = i + 1; break
-    return raw[:end].strip() if end else raw.strip()
-
-
-def _call_groq(client, model, b64, mime):
-    return client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-            {"type": "text", "text": PROMPT}
-        ]}],
-        temperature=0.0,
-        max_tokens=4096,
-    )
+    end = raw.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        return raw[start:end+1].strip()
+    
+    return raw
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
@@ -76,14 +62,20 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
 
     last_error = None
     for model in VISION_MODELS:
-        for attempt in range(2):  # 2 tentatives par modèle
+        for attempt in range(3):
             try:
-                response = _call_groq(client, model, b64, mime)
-                raw = response.choices[0].message.content.strip()
-                raw = re.sub(r'```json\s*', '', raw)
-                raw = re.sub(r'```\s*', '', raw)
-                raw = _fix_json(raw)
-                parsed = json.loads(raw)
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        {"type": "text", "text": PROMPT}
+                    ]}],
+                    temperature=0.0,
+                    max_tokens=4096,
+                )
+                raw = response.choices[0].message.content
+                clean = _extract_json(raw)
+                parsed = json.loads(clean)
                 controls = parsed.get("controls", [])
                 mockup_w = str(parsed.get("mockupW", "1000"))
                 mockup_h = str(parsed.get("mockupH", "800"))
@@ -104,14 +96,16 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
                 }
             except (InternalServerError, RateLimitError) as e:
                 last_error = e
-                wait = 3 * (attempt + 1)
-                time.sleep(wait)
+                time.sleep(3 * (attempt + 1))
                 continue
+            except json.JSONDecodeError as e:
+                last_error = ValueError(f"JSON invalide: {e}")
+                break
             except Exception as e:
                 last_error = e
-                break  # Essayer le modèle suivant
+                break
 
-    raise ValueError(f"Tous les modèles Groq sont indisponibles. Réessayez dans quelques secondes. ({last_error})")
+    raise ValueError(f"Erreur Groq: {last_error}")
 
 
 def extract_components(mockup_json: Dict) -> List[Dict]:
