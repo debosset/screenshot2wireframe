@@ -5,8 +5,8 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, PlainTextResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 
-from .balsamiq_json import classify, to_clipboard_json
-from .opencv_analyzer import analyze_screenshot
+from .balsamiq_json import to_clipboard_json
+from .smart_analyzer import smart_analyze
 from .bmpr_builder import build_bmpr
 
 BASE_DIR = Path(__file__).parent.parent
@@ -71,50 +71,13 @@ async def analyze(
 
     # On garde l'image pour l'OCR — suppression après
     try:
-        components = analyze_screenshot(str(upload_path))
-        if not components:
+        result = smart_analyze(str(upload_path))
+        if not result:
             raise HTTPException(422, "Aucun composant détecté.")
 
-        img_w = max((c["x"] + c["w"]) for c in components)
-        img_h = max((c["y"] + c["h"]) for c in components)
-
-        for c in components:
-            c["typeID"] = classify(c.get("type", "Rectangle"), c["x"], c["y"], c["w"], c["h"], img_w, img_h, mode=component_mode or "all")
-
-        # OCR — lire les textes
-        try:
-            from .ocr_reader import enrich_with_text
-            components = enrich_with_text(components, str(upload_path))
-        except Exception as e:
-            pass  # OCR optionnel
-
-        # Trier par position
-        components.sort(key=lambda c: (c["y"], c["x"]))
-
-        # Préparer la réponse
-        result = []
-        for c in components:
-            text = c.get("_text", "")
-            label_above = c.get("_label_above", "")
-            tid = c["typeID"]
-
-            # Description lisible
-            if label_above:
-                description = f"{label_above}"
-            elif text:
-                description = text
-            else:
-                description = ""
-
-            result.append({
-                "typeID": tid,
-                "label": TYPE_LABELS.get(tid, f"▭ {tid}"),
-                "description": description,
-                "x": c["x"], "y": c["y"],
-                "w": c["w"], "h": c["h"],
-                "measuredW": c.get("measuredW", c["w"]),
-                "measuredH": c.get("measuredH", c["h"]),
-            })
+        for c in result:
+            if "label" not in c:
+                c["label"] = TYPE_LABELS.get(c["typeID"], f"▭ {c['typeID']}")
 
         CACHE[job_id] = result
 

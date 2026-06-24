@@ -1,124 +1,87 @@
 """
-Lit le texte dans les zones détectées par OpenCV.
-Permet d'identifier les labels au-dessus des champs et le contenu des zones.
+Lit le texte avec tesseract et l'associe aux composants OpenCV.
+Les composants sont en coordonnées base-1000px (largeur = 1000, hauteur proportionnelle).
 """
 import cv2
-import numpy as np
 import pytesseract
-from typing import List, Dict, Any, Optional
-import re
-
-
-def _clean(text: str) -> str:
-    """Nettoie le texte OCR : supprime les caractères parasites."""
-    text = text.strip()
-    text = re.sub(r'[|\\{}\[\]<>]', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
-
-
-def _read_zone(img: np.ndarray, x: int, y: int, w: int, h: int, lang: str = "fra+eng") -> str:
-    """Lit le texte dans une zone de l'image."""
-    # Marges légères pour capturer le texte complet
-    pad = 4
-    x1 = max(0, x - pad)
-    y1 = max(0, y - pad)
-    x2 = min(img.shape[1], x + w + pad)
-    y2 = min(img.shape[0], y + h + pad)
-
-    roi = img[y1:y2, x1:x2]
-    if roi.size == 0:
-        return ""
-
-    # Prétraitement pour améliorer l'OCR
-    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) if len(roi.shape) == 3 else roi
-    # Agrandir pour meilleure reconnaissance
-    scale = max(1, int(30 / h)) + 1  # plus on est petit, plus on agrandit
-    if scale > 1:
-        gray = cv2.resize(gray, (gray.shape[1] * scale, gray.shape[0] * scale), interpolation=cv2.INTER_CUBIC)
-
-    # Binarisation
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    config = "--psm 7 --oem 3"  # psm 7 = ligne unique
-    try:
-        text = pytesseract.image_to_string(binary, lang=lang, config=config)
-        return _clean(text)
-    except Exception:
-        return ""
-
-
-def _find_label_above(components: List[Dict], target_idx: int, img: np.ndarray) -> Optional[str]:
-    """
-    Cherche un composant texte situé juste au-dessus du composant cible.
-    Typiquement un Label au-dessus d'un TextInput.
-    """
-    target = components[target_idx]
-    tx, ty, tw = target["x"], target["y"], target["w"]
-
-    best = None
-    best_dist = 999
-
-    for i, c in enumerate(components):
-        if i == target_idx:
-            continue
-        cx, cy, cw, ch = c["x"], c["y"], c["w"], c["h"]
-
-        # Le label doit être AU-DESSUS (y < ty) et proche verticalement
-        dist_y = ty - (cy + ch)
-        if dist_y < 0 or dist_y > 40:
-            continue
-
-        # Alignement horizontal : chevauchement ou proximité
-        overlap_x = min(tx + tw, cx + cw) - max(tx, cx)
-        if overlap_x < min(tw, cw) * 0.2:
-            continue
-
-        if dist_y < best_dist:
-            best_dist = dist_y
-            best = c
-
-    if best and best.get("_text"):
-        return best["_text"]
-    return None
+from typing import List, Dict, Any
 
 
 def enrich_with_text(components: List[Dict[str, Any]], image_path: str) -> List[Dict[str, Any]]:
-    """
-    Enrichit chaque composant avec le texte OCR lu dans sa zone
-    et le label trouvé au-dessus (pour les TextInput).
-    """
     img = cv2.imread(image_path)
     if img is None:
         return components
 
     img_h, img_w = img.shape[:2]
+    # OpenCV travaille avec largeur = 1000px, hauteur proportionnelle
+    # Donc scale = img_w / 1000 pour X ET Y
+    scale = img_w / 1000
 
-    # Détecter les langues disponibles
-    try:
-        langs = pytesseract.get_languages()
-        lang = "fra+eng" if "fra" in langs else "eng"
-    except Exception:
-        lang = "eng"
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # Lire le texte dans chaque zone
+    # Extraction mot par mot
+    data = pytesseract.image_to_data(
+        gray, lang='fra+eng',
+        config='--psm 6 --oem 3',
+        output_type=pytesseract.Output.DICT
+    )
+
+    # Mots en coordonnées base-1000
+    words = []
+    for i, word in enumerate(data['text']):
+        word = word.strip()
+        if not word or int(data['conf'][i]) < 35:
+            continue
+        words.append({
+            'text': word,
+            'x':  data['left'][i]  / scale,
+            'y':  data['top'][i]   / scale,
+            'w':  data['width'][i] / scale,
+            'h':  data['height'][i]/ scale,
+            'cx': (data['left'][i] + data['width'][i]/2)  / scale,
+            'cy': (data['top'][i]  + data['height'][i]/2) / scale,
+        })
+
+    def words_in_zone(x, y, w, h):
+        out = [wd for wd in words
+               if x - 3 <= wd['cx'] <= x + w + 3
+               and y - 3 <= wd['cy'] <= y + h + 3]
+        out.sort(key=lambda wd: (round(wd['y']/5)*5, wd['x']))
+        return out
+
+    def words_above(x, y, w, max_dist=40):
+        out = []
+        for wd in words:
+            # Le mot doit être au-dessus de la zone (cy < y) et pas trop loin
+            dist = y - wd['cy']
+            if not (2 < dist < max_dist):
+                continue
+            # Aligné horizontalement avec la zone
+            if wd['cx'] < x - 10 or wd['cx'] > x + w + 10:
+                continue
+            out.append(wd)
+        out.sort(key=lambda wd: (round(wd['y']/5)*5, wd['x']))
+        return out
+
     for c in components:
-        x, y, w, h = c["x"], c["y"], c["w"], c["h"]
-        # Convertir depuis coordonnées 1000px vers pixels réels
-        scale = img_w / 1000
-        rx = int(x * scale)
-        ry = int(y * scale)
-        rw = int(w * scale)
-        rh = int(h * scale)
+        cx, cy, cw, ch = c['x'], c['y'], c['w'], c['h']
+        tid = c.get('typeID', 'Rectangle')
 
-        text = _read_zone(img, rx, ry, rw, rh, lang=lang)
-        c["_text"] = text if len(text) > 1 else ""
+        in_zone = words_in_zone(cx, cy, cw, ch)
+        above   = words_above(cx, cy, cw)
 
-    # Pour les TextInput/TextArea, chercher le label au-dessus
-    for i, c in enumerate(components):
-        if c.get("typeID") in {"TextInput", "TextArea", "SearchBox", "ComboBox", "CheckBox"}:
-            label_text = _find_label_above(components, i, img)
-            if label_text:
-                c["_label_above"] = label_text
+        zone_text  = ' '.join(wd['text'] for wd in in_zone).strip()
+        label_text = ' '.join(wd['text'] for wd in above).strip()
+
+        c['_text']        = zone_text
+        c['_label_above'] = label_text
+
+        # Description selon le type
+        if tid in {'TextInput', 'TextArea', 'SearchBox', 'ComboBox'}:
+            c['description'] = label_text or zone_text or ''
+        elif tid in {'Button', 'PointyButton', 'ButtonBar'}:
+            c['description'] = zone_text or ''
+        else:
+            c['description'] = zone_text or label_text or ''
 
     return components
