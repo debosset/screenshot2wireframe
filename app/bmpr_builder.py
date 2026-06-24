@@ -1,116 +1,123 @@
 """
-Génère un fichier .bmpr moderne pour Balsamiq Wireframes.
-
-Important : BMML est l'ancien format XML. Balsamiq Wireframes travaille avec des
-projets .bmpr. Le fichier généré ici est un projet JSON contenant un wireframe.
+Génère un .bmpr valide — schéma reverse-engineered depuis vrais fichiers Balsamiq.
+Schéma réel : tables MAJUSCULES, colonnes ID/BRANCHID/ATTRIBUTES/DATA
 """
-import json
-import uuid
-from typing import Any, Dict, List
+import json, sqlite3, zlib, uuid, time, os
+from typing import List, Dict, Any
 
 TYPE_MAP = {
-    "NavBar": "NavBar",
-    "NavigationBar": "NavBar",
-    "Button": "Button",
-    "ButtonBar": "ButtonBar",
-    "CheckBox": "CheckBox",
-    "RadioButton": "RadioButton",
-    "TextInput": "TextInput",
-    "TextArea": "TextArea",
-    "ComboBox": "ComboBox",
-    "Label": "Label",
-    "Title": "Title",
-    "Image": "Image",
-    "Rectangle": "Rectangle",
-    "FieldSet": "FieldSet",
-    "DataGrid": "DataGrid",
-    "HRule": "HRule",
-    "SearchBox": "SearchBox",
-    "Paragraph": "Paragraph",
-    "Icon": "Icon",
-    "Link": "Link",
+    "com.balsamiq.mockups::Button":        "Button",
+    "com.balsamiq.mockups::TextInput":     "TextInput",
+    "com.balsamiq.mockups::Label":         "Label",
+    "com.balsamiq.mockups::CheckBox":      "CheckBox",
+    "com.balsamiq.mockups::Image":         "Image",
+    "com.balsamiq.mockups::NavigationBar": "NavBar",
+    "com.balsamiq.mockups::Rectangle":     "Rectangle",
+    "NavBar": "NavBar", "TabBar": "TabBar",
+    "Button": "Button", "TextInput": "TextInput",
+    "Label": "Label", "Title": "Title",
+    "CheckBox": "CheckBox", "ComboBox": "ComboBox",
+    "Image": "Image", "Rectangle": "Rectangle",
+    "FieldSet": "FieldSet", "DataGrid": "DataGrid",
+    "HRule": "HRule", "SearchBox": "SearchBox",
+    "Paragraph": "Paragraph", "TextArea": "TextArea",
 }
 
-DEFAULT_PROPS = {
-    "Button": {"text": "Button"},
-    "CheckBox": {"text": "Option"},
-    "RadioButton": {"text": "Option"},
-    "Label": {"text": "Label"},
-    "Title": {"text": "Title"},
-    "NavBar": {"text": "Home, About, Contact"},
-    "TextInput": {"text": ""},
-    "TextArea": {"text": ""},
-    "ComboBox": {"text": "Option 1\nOption 2\nOption 3"},
-    "SearchBox": {"text": "Search"},
-    "DataGrid": {"text": "Header 1, Header 2\nRow 1, Row 1"},
-}
+def _enc(data: dict) -> bytes:
+    return zlib.compress(json.dumps(data, separators=(",", ":")).encode("utf-8"), level=6)
 
-
-def _short_type(value: str | None) -> str:
-    if not value:
-        return "Rectangle"
-    if "::" in value:
-        value = value.split("::", 1)[1]
-    return TYPE_MAP.get(value, "Rectangle")
-
-
-def _control(comp: Dict[str, Any], index: int) -> Dict[str, Any]:
-    type_id = _short_type(comp.get("typeID") or comp.get("type"))
-    control = {
-        "ID": str(index + 1),
-        "typeID": type_id,
-        "zOrder": str(index),
-        "measuredW": str(int(comp.get("measuredW", comp["w"]))),
-        "measuredH": str(int(comp.get("measuredH", comp["h"]))),
-        "x": str(int(comp["x"])),
-        "y": str(int(comp["y"])),
-        "w": str(int(comp["w"])),
-        "h": str(int(comp["h"])),
-    }
-    control.update(DEFAULT_PROPS.get(type_id, {}))
-    return control
-
-
-def build_bmpr_data(components: List[Dict[str, Any]], name: str = "Wireframe") -> Dict[str, Any]:
-    mockup_w = max((int(c["x"]) + int(c["w"]) for c in components), default=1000)
-    mockup_h = max((int(c["y"]) + int(c["h"]) for c in components), default=800)
-    resource_id = str(uuid.uuid4()).upper()
-
-    mockup = {
-        "controls": {"control": [_control(c, i) for i, c in enumerate(components)]},
-        "attributes": {
-            "name": name or "Wireframe",
-            "order": 1,
-            "parentID": None,
-            "notes": None,
-        },
-        "branchID": "Master",
-        "resourceID": resource_id,
-        "mockupH": str(mockup_h),
-        "mockupW": str(mockup_w),
-        "measuredW": str(mockup_w),
-        "measuredH": str(mockup_h),
-        "version": "1.0",
-        "calloutsOffset": {"x": 0, "y": 0},
-    }
-
+def _ctrl(comp: Dict[str, Any], index: int) -> Dict[str, Any]:
+    tid = TYPE_MAP.get(comp.get("typeID", comp.get("type", "Rectangle")), "Rectangle")
     return {
-        "version": "1.0",
-        "projectID": "0:1",
-        "branchID": "Master",
-        "mockups": [
-            {
-                "id": resource_id,
-                "name": name or "Wireframe",
-                "mockup": mockup,
-            }
-        ],
-        "assets": [],
-        "symbols": [],
-        "trash": [],
+        "ID": str(index),
+        "typeID": tid,
+        "zOrder": str(index),
+        "w": str(comp["w"]),
+        "h": str(comp["h"]),
+        "measuredW": str(comp.get("measuredW", comp["w"])),
+        "measuredH": str(comp.get("measuredH", comp["h"])),
+        "x": str(comp["x"]),
+        "y": str(comp["y"]),
     }
 
+def build_bmpr(components: List[Dict[str, Any]], output_path: str, project_name: str = "Wireframe") -> None:
+    if os.path.exists(output_path):
+        os.unlink(output_path)
 
-def build_bmpr(components: List[Dict[str, Any]], output_path: str, name: str = "Wireframe") -> None:
-    with open(output_path, "w", encoding="utf-8", newline="") as f:
-        json.dump(build_bmpr_data(components, name), f, ensure_ascii=False, indent=2)
+    controls = [_ctrl(c, i) for i, c in enumerate(components)]
+    max_w = max((c["x"] + c["w"]) for c in components) if components else 1000
+    max_h = max((c["y"] + c["h"]) for c in components) if components else 800
+
+    mockup_data = {
+        "mockup": {
+            "controls": {"control": controls},
+            "measuredW": str(max_w),
+            "measuredH": str(max_h),
+            "mockupW": str(max_w),
+            "mockupH": str(max_h),
+            "version": "1.0",
+        }
+    }
+
+    mockup_id = str(uuid.uuid4()).upper()
+    branch_attrs = json.dumps({
+        "projectDescription": "",
+        "symbolLibraryID": "",
+        "fontFace": "Balsamiq Sans",
+        "fontSize": 13,
+        "linkColor": 545684,
+        "selectionColor": 9813234,
+        "skinName": "sketch"
+    })
+
+    mockup_attrs = _enc({
+        "kind": "mockup",
+        "name": project_name,
+        "order": 1000.0
+    })
+
+    conn = sqlite3.connect(output_path)
+    c = conn.cursor()
+
+    c.executescript("""
+        CREATE TABLE INFO (
+            KEY TEXT PRIMARY KEY,
+            VALUE TEXT
+        );
+        CREATE TABLE BRANCHES (
+            ID TEXT PRIMARY KEY,
+            ATTRIBUTES TEXT
+        );
+        CREATE TABLE RESOURCES (
+            ID TEXT PRIMARY KEY,
+            BRANCHID TEXT NOT NULL,
+            ATTRIBUTES BLOB,
+            DATA BLOB
+        );
+        CREATE TABLE THUMBNAILS (
+            RESOURCEID TEXT,
+            BRANCHID TEXT,
+            DATA BLOB
+        );
+    """)
+
+    # INFO
+    c.executemany("INSERT INTO INFO VALUES (?,?)", [
+        ("SchemaVersion", "2.0"),
+        ("ArchiveFormat", "bmpr"),
+        ("ArchiveRevisionUUID", ""),
+        ("ArchiveAttributes", json.dumps({"name": project_name})),
+        ("ArchiveRevision", "1"),
+    ])
+
+    # BRANCHES
+    c.execute("INSERT INTO BRANCHES VALUES (?,?)", ("Master", branch_attrs))
+
+    # RESOURCES — mockup
+    c.execute(
+        "INSERT INTO RESOURCES (ID, BRANCHID, ATTRIBUTES, DATA) VALUES (?,?,?,?)",
+        (mockup_id, "Master", mockup_attrs, _enc(mockup_data))
+    )
+
+    conn.commit()
+    conn.close()
