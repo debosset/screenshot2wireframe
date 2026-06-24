@@ -4,19 +4,24 @@ from typing import List, Dict, Any
 from groq import Groq, InternalServerError, RateLimitError
 from PIL import Image
 
-# Prompt court avec exemple — Groq copie le format exactement
-PROMPT = """Analyze this web form screenshot and return a Balsamiq wireframe JSON.
+# Étape 1 : Groq décrit les éléments en texte simple (peu de tokens)
+PROMPT_DESCRIBE = """Analyze this web form screenshot. List each UI element on ONE line using this format:
+TYPE|TEXT|X|Y|W|H
 
-Return ONLY raw JSON (no markdown, no backticks), following this exact structure:
-{"controls":[{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"100","y":"20","properties":{"text":"Page Title"}},{"ID":"1","typeID":"SubTitle","zOrder":"1","measuredW":"250","measuredH":"24","x":"100","y":"60","properties":{"text":"Section name"}},{"ID":"2","typeID":"Label","zOrder":"2","measuredW":"100","measuredH":"17","x":"100","y":"100","properties":{"text":"Field label"}},{"ID":"3","typeID":"TextInput","zOrder":"3","measuredW":"79","measuredH":"27","x":"100","y":"118","w":"500"},{"ID":"4","typeID":"CheckBox","zOrder":"4","measuredW":"100","measuredH":"23","x":"100","y":"160","properties":{"text":"Option text"}},{"ID":"5","typeID":"Button","zOrder":"5","measuredW":"61","measuredH":"27","x":"100","y":"200","properties":{"text":"Submit"}}],"mockupW":"1000","mockupH":"400"}
+Types: Title, SubTitle, Label, TextInput, TextArea, Button, CheckBox, RadioButton, NavBar, Link, HRule
+- X,Y = position (0-1000 horizontal, 0-800 vertical)
+- W = width (for TextInput/TextArea only)
+- H = height (optional)
 
-Rules:
-- Label always 15px above its TextInput (label y + 15 = input y)
-- TextInput must have w (width in px)
-- Button/Label/CheckBox/RadioButton: no w or h attributes
-- All values are strings
-- Max 25 controls total
-- Raw JSON only"""
+Example output:
+Title|Identification du demandeur|100|20|600|
+Label|Nom|100|80||
+TextInput|de Bosset|100|95|500|
+Label|Prénom|600|80||
+TextInput|Adrien|600|95|300|
+Button|Suivant|700|400||
+
+List ALL visible elements. One element per line. Nothing else."""
 
 
 def _prepare_image(image_path: str, max_size: int = 768) -> tuple:
@@ -33,18 +38,76 @@ def _prepare_image(image_path: str, max_size: int = 768) -> tuple:
     return base64.standard_b64encode(buf.read()).decode("utf-8"), "image/jpeg"
 
 
-def _extract_json(raw: str) -> str:
-    raw = raw.strip()
-    # Enlever backticks si présents
-    m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
-    if m:
-        return m.group(1).strip()
-    # Sinon prendre entre premier { et dernier }
-    start = raw.find('{')
-    end = raw.rfind('}')
-    if start != -1 and end != -1 and end > start:
-        return raw[start:end+1].strip()
-    return raw
+MEASURED_DEFAULTS = {
+    "Title":       (300, 30), "SubTitle":    (250, 24), "Label":       (100, 17),
+    "Link":        (150, 17), "TextInput":   (79,  27), "TextArea":    (200, 100),
+    "Button":      (61,  27), "ButtonBar":   (159, 27), "CheckBox":    (100, 23),
+    "RadioButton": (97,  23), "HRule":       (200, 10), "NavBar":      (300, 30),
+    "Image":       (200, 150),"Rectangle":   (200, 150),
+}
+
+
+def _parse_lines_to_controls(text: str) -> List[Dict]:
+    """Convertit le texte ligne par ligne en contrôles Balsamiq."""
+    controls = []
+    id_ = 0
+    for line in text.strip().split('\n'):
+        line = line.strip()
+        if not line or '|' not in line:
+            continue
+        parts = line.split('|')
+        if len(parts) < 2:
+            continue
+
+        tid = parts[0].strip()
+        label_text = parts[1].strip() if len(parts) > 1 else ""
+        
+        # Nettoyer le typeID
+        tid_map = {
+            'title': 'Title', 'subtitle': 'SubTitle', 'label': 'Label',
+            'textinput': 'TextInput', 'input': 'TextInput', 'text': 'TextInput',
+            'textarea': 'TextArea', 'button': 'Button', 'checkbox': 'CheckBox',
+            'check': 'CheckBox', 'radio': 'RadioButton', 'radiobutton': 'RadioButton',
+            'navbar': 'NavBar', 'nav': 'NavBar', 'link': 'Link', 'hrule': 'HRule',
+            'image': 'Image', 'rectangle': 'Rectangle',
+        }
+        tid = tid_map.get(tid.lower(), tid)
+        if tid not in MEASURED_DEFAULTS:
+            tid = 'Label'
+
+        try:
+            x = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip() else 100
+            y = int(parts[3].strip()) if len(parts) > 3 and parts[3].strip() else 100
+            w = int(parts[4].strip()) if len(parts) > 4 and parts[4].strip() else None
+            h = int(parts[5].strip()) if len(parts) > 5 and parts[5].strip() else None
+        except (ValueError, IndexError):
+            x, y, w, h = 100, 100 + id_ * 30, None, None
+
+        mw, mh = MEASURED_DEFAULTS.get(tid, (100, 20))
+
+        ctrl = {
+            "ID": str(id_),
+            "typeID": tid,
+            "zOrder": str(id_),
+            "measuredW": str(mw),
+            "measuredH": str(mh),
+            "x": str(x),
+            "y": str(y),
+        }
+
+        # w/h seulement si différent des defaults
+        if tid in {"TextInput", "TextArea", "NavBar", "HRule", "Rectangle", "Image"}:
+            if w: ctrl["w"] = str(w)
+            if h and h != mh: ctrl["h"] = str(h)
+
+        # Properties avec le texte
+        if label_text and tid not in {"TextInput", "TextArea", "HRule", "Image", "Rectangle"}:
+            ctrl["properties"] = {"text": label_text}
+
+        controls.append(ctrl)
+        id_ += 1
+
+    return controls
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
@@ -54,42 +117,50 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     last_error = None
     for attempt in range(3):
         try:
+            # Groq décrit en texte — pas de JSON à parser !
             response = client.chat.completions.create(
                 model="meta-llama/llama-4-scout-17b-16e-instruct",
                 messages=[{"role": "user", "content": [
                     {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": PROMPT}
+                    {"type": "text", "text": PROMPT_DESCRIBE}
                 ]}],
                 temperature=0.0,
-                max_tokens=3000,
+                max_tokens=2000,
             )
             raw = response.choices[0].message.content
-            clean = _extract_json(raw)
-            parsed = json.loads(clean)
-            controls = parsed.get("controls", [])
-            mockup_w = str(parsed.get("mockupW", "1000"))
-            mockup_h = str(parsed.get("mockupH", "800"))
+            
+            # Convertir le texte en contrôles Balsamiq
+            controls = _parse_lines_to_controls(raw)
+            
+            if not controls:
+                raise ValueError("Aucun composant détecté")
+
+            # Calculer les dimensions
+            max_y = max(int(c["y"]) + MEASURED_DEFAULTS.get(c["typeID"], (100,30))[1] for c in controls)
+            mockup_h = str(max(max_y + 50, 400))
+
             return {
                 "mockup": {
                     "controls": {"control": controls},
                     "attributes": {"name": "New Wireframe 1", "order": 938428.5264654435, "parentID": None, "notes": None},
                     "branchID": "Master",
                     "resourceID": str(uuid.uuid4()).upper(),
-                    "mockupH": mockup_h, "mockupW": mockup_w,
-                    "measuredW": mockup_w, "measuredH": mockup_h,
+                    "mockupH": mockup_h,
+                    "mockupW": "1000",
+                    "measuredW": "1000",
+                    "measuredH": mockup_h,
                     "version": "1.0",
                     "calloutsOffset": {"x": 0, "y": 0},
                 },
                 "groupOffset": {"x": 0, "y": 0},
                 "dependencies": [],
                 "projectID": project_id,
+                "_raw_description": raw,  # pour debug
             }
+
         except (InternalServerError, RateLimitError) as e:
             last_error = e
             time.sleep(3 * (attempt + 1))
-        except json.JSONDecodeError as e:
-            last_error = ValueError(f"JSON invalide: {e}")
-            break
         except Exception as e:
             last_error = e
             break
