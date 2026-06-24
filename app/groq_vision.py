@@ -1,48 +1,34 @@
 """
-Analyse un screenshot avec Groq Vision (LLaVA) — gratuit jusqu'à 30 req/min.
-Retourne une liste de composants Balsamiq prêts à l'emploi.
+Analyse un screenshot avec Groq Vision — gratuit jusqu'à 30 req/min.
 """
 import base64
 import json
 import re
+import uuid
 from pathlib import Path
 from typing import List, Dict, Any
 from groq import Groq
 
 
-SYSTEM_PROMPT = """Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne UNIQUEMENT un JSON valide.
+PROMPT = """Analyse ce screenshot d'interface web et génère un wireframe Balsamiq.
 
-RÈGLES STRICTES :
-- Réponds UNIQUEMENT avec du JSON brut, sans markdown, sans explication, sans ```
-- Détecte TOUS les éléments visibles de haut en bas
-- Utilise ces typeIDs exacts : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, Image, Rectangle, HRule, NavBar, TabBar, BreadCrumb, Pagination, DataGrid
-- Les coordonnées x/y/w/h sont en base 1000px de large (hauteur proportionnelle)
-- ID commence à 0, zOrder identique à ID
-- Tous les champs sont des strings
+Retourne UNIQUEMENT un objet JSON valide, sans texte avant ni après, sans markdown, sans ```.
 
-FORMAT EXACT :
-{
-  "controls": [
-    {"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Mon titre"}},
-    {"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Nom"}},
-    {"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400","properties":{"text":""}},
-    {"ID":"3","typeID":"CheckBox","zOrder":"3","measuredW":"100","measuredH":"23","x":"50","y":"120","properties":{"text":"Option","selected":true}}
-  ],
-  "mockupW": "1000",
-  "mockupH": "800"
-}
+Format requis :
+{"controls":[{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Mon titre"}},{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Nom"}},{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400"}],"mockupW":"1000","mockupH":"800"}
 
-IMPORTANT pour le placement :
-- Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
-- Respecte la hiérarchie visuelle : titres > sous-titres > labels > champs
-- Pour les RadioButton côte à côte : même y, x différents
-- TextInput a toujours un w (largeur) car il est redimensionné
-- Button, Label, CheckBox, RadioButton n'ont PAS de w/h (taille par défaut)"""
+TypeIDs valides : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, NavBar, Image, Rectangle, HRule
+
+Règles :
+- Label placé 15px au-dessus du TextInput correspondant
+- TextInput a toujours w (largeur en px)
+- Button, Label, CheckBox, RadioButton : pas de w/h
+- Coordonnées base 1000px de large
+- Commence à ID 0, tous les champs sont des strings
+- JSON pur uniquement, pas de texte"""
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
-    """Analyse l'image et retourne le JSON Balsamiq complet."""
-    # Encoder l'image
     img_bytes = Path(image_path).read_bytes()
     b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
     suffix = Path(image_path).suffix.lower()
@@ -50,34 +36,73 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
 
     client = Groq(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": SYSTEM_PROMPT},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": "Analyse ce screenshot et retourne le JSON Balsamiq."}
-                ]
-            }
-        ],
-        temperature=0.1,
-        max_tokens=4096,
-    )
+    # Essayer plusieurs modèles vision Groq
+    models = [
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.2-90b-vision-preview",
+        "llama-3.2-11b-vision-preview",
+    ]
 
-    raw = response.choices[0].message.content.strip()
-    # Nettoyer si markdown
-    raw = re.sub(r'^```json\s*', '', raw)
-    raw = re.sub(r'^```\s*', '', raw)
-    raw = re.sub(r'\s*```$', '', raw)
+    raw = None
+    last_err = None
+    for model in models:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        {"type": "text", "text": PROMPT}
+                    ]
+                }],
+                temperature=0.0,
+                max_tokens=4096,
+                response_format={"type": "json_object"},
+            )
+            raw = response.choices[0].message.content.strip()
+            break
+        except Exception as e:
+            last_err = e
+            # Si ce modèle ne supporte pas json_object, essayer sans
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                            {"type": "text", "text": PROMPT}
+                        ]
+                    }],
+                    temperature=0.0,
+                    max_tokens=4096,
+                )
+                raw = response.choices[0].message.content.strip()
+                break
+            except Exception as e2:
+                last_err = e2
+                continue
+
+    if raw is None:
+        raise Exception(f"Aucun modèle Groq disponible : {last_err}")
+
+    # Nettoyer la réponse
+    raw = re.sub(r'^```json\s*', '', raw, flags=re.MULTILINE)
+    raw = re.sub(r'^```\s*', '', raw, flags=re.MULTILINE)
+    raw = re.sub(r'```\s*$', '', raw, flags=re.MULTILINE)
+    raw = raw.strip()
+
+    # Extraire le JSON si du texte est autour
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if json_match:
+        raw = json_match.group(0)
 
     parsed = json.loads(raw)
     controls = parsed.get("controls", [])
-    mockup_w = parsed.get("mockupW", "1000")
-    mockup_h = parsed.get("mockupH", "800")
+    mockup_w = str(parsed.get("mockupW", "1000"))
+    mockup_h = str(parsed.get("mockupH", "800"))
 
-    import uuid
     return {
         "mockup": {
             "controls": {"control": controls},
@@ -98,7 +123,6 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
 
 
 def extract_components(mockup_json: Dict) -> List[Dict]:
-    """Extourne la liste de composants pour l'affichage UI."""
     TYPE_LABELS = {
         "Title": "🔤 Titre", "SubTitle": "🔤 Sous-titre", "Label": "🏷️ Label",
         "Link": "🔗 Lien", "TextInput": "✏️ Champ texte", "TextArea": "📄 Zone texte",
