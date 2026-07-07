@@ -286,16 +286,30 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
             controls.append(_make_ctrl(id_, "Label", lx, ly, props={"text": text}))
             id_ += 1
 
-            # Trouver le champ associé
+            # Trouver le champ associé -- on exclut toute zone qui a en
+            # réalité une AUTRE ligne de texte juste au-dessus d'elle : ça
+            # veut dire que ce champ appartient à ce label-là, pas au nôtre
+            # (cas vécu : "Identification de l'entité" volait le champ du
+            # label suivant "Numéro IDE" parce que rien ne vérifiait qu'un
+            # autre texte ne s'intercalait pas entre les deux)
             best_inp = None
             best_dist = 999
             for k, inp in enumerate(inputs):
                 dist = inp['y'] - (ly + lh)
                 if 0 < dist < 40:
                     overlap = min(lx+lw, inp['x']+inp['w']) - max(lx, inp['x'])
-                    if overlap > 0 and dist < best_dist:
-                        best_dist = dist
-                        best_inp = (k, inp)
+                    if overlap <= 0 or dist >= best_dist:
+                        continue
+                    intervening = any(
+                        other is not line and
+                        (ly + lh) < other['y'] < inp['y'] and
+                        min(lx+lw, other['x']+other['w']) - max(lx, other['x']) > 0
+                        for other in lines
+                    )
+                    if intervening:
+                        continue
+                    best_dist = dist
+                    best_inp = (k, inp)
 
             if best_inp and best_inp[0] not in used_inputs:
                 k, inp = best_inp
