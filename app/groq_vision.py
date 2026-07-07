@@ -45,6 +45,7 @@ RÈGLES STRICTES :
 - Les coordonnées x/y/w/h sont en base 1000px de large (hauteur proportionnelle)
 - ID commence à 0, zOrder identique à ID
 - Tous les champs sont des strings
+- IMPORTANT: si un texte contient des guillemets (ex: « Romande Énergie SA »), échappe tout guillemet droit interne avec \" -- ne laisse JAMAIS un caractère " non échappé à l'intérieur d'une valeur "text". Préfère garder les guillemets français « » tels quels, ils ne posent pas de problème contrairement aux guillemets droits "
 
 FORMAT EXACT :
 {{
@@ -64,6 +65,38 @@ IMPORTANT pour le placement :
 - Pour les RadioButton côte à côte : même y, x différents
 - TextInput a toujours un w (largeur) car il est redimensionné
 - Button, Label, CheckBox, RadioButton n'ont PAS de w/h (taille par défaut)"""
+
+
+def _repair_unescaped_quotes(raw: str) -> str:
+    """
+    Répare les guillemets internes non échappés dans les valeurs de la clé
+    "text" -- Groq génère parfois du texte citant des guillemets (ex: « Romande
+    Énergie SA ») sans les échapper, ce qui casse le JSON strict avec une
+    erreur du type "Expecting ':' delimiter" au milieu d'une ligne.
+    Ne touche qu'aux valeurs "text":"..." ; laisse le reste du JSON intact.
+    """
+    out = []
+    i, n = 0, len(raw)
+    while i < n:
+        m = re.match(r'"text"\s*:\s*"', raw[i:]) if raw[i] == '"' else None
+        if m:
+            out.append(raw[i:i + m.end()])
+            i += m.end()
+            while i < n:
+                ch = raw[i]
+                if ch == '\\' and i + 1 < n:
+                    out.append(raw[i:i + 2]); i += 2; continue
+                if ch == '"':
+                    j = i + 1
+                    while j < n and raw[j] in ' \t\r\n':
+                        j += 1
+                    if j < n and raw[j] in ',}':
+                        out.append('"'); i += 1; break
+                    out.append('\\"'); i += 1; continue
+                out.append(ch); i += 1
+            continue
+        out.append(raw[i]); i += 1
+    return ''.join(out)
 
 
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
@@ -98,7 +131,15 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     raw = re.sub(r'^```\s*', '', raw)
     raw = re.sub(r'\s*```$', '', raw)
 
-    parsed = json.loads(raw)
+    parsed = None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        # Filet de sécurité : Groq a généré un JSON avec des guillemets
+        # internes non échappés (ex: texte citant « Romande Énergie SA »).
+        # On tente une réparation ciblée avant d'abandonner.
+        parsed = json.loads(_repair_unescaped_quotes(raw))
+
     controls = parsed.get("controls", [])
     mockup_w = parsed.get("mockupW", "1000")
     mockup_h = parsed.get("mockupH", "800")
