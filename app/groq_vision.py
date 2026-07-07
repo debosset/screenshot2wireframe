@@ -63,8 +63,9 @@ IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
 - Respecte la hiérarchie visuelle : titres > sous-titres > labels > champs
 - Pour les RadioButton côte à côte : même y, x différents
-- TextInput a toujours un w (largeur) car il est redimensionné
-- Button, Label, CheckBox, RadioButton n'ont PAS de w/h (taille par défaut)"""
+- TextInput a toujours un w (largeur) car il est redimensionné, EN PLUS de measuredW/measuredH qui restent obligatoires sur CHAQUE contrôle sans exception
+- Button, Label, CheckBox, RadioButton n'ont pas besoin de w/h (taille par défaut), mais measuredW et measuredH restent obligatoires pour eux aussi
+- Ne JAMAIS écrire une clé sans sa valeur (ex: "measuredW","measuredH":"20" est INVALIDE) : chaque clé doit toujours être suivie de ":" puis de sa valeur avant la virgule suivante"""
 
 
 def _repair_dangling_keys(raw: str) -> str:
