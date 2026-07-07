@@ -65,7 +65,12 @@ IMPORTANT pour le placement :
 - Pour les RadioButton côte à côte : même y, x différents
 - TextInput a toujours un w (largeur) car il est redimensionné, EN PLUS de measuredW/measuredH qui restent obligatoires sur CHAQUE contrôle sans exception
 - Button, Label, CheckBox, RadioButton n'ont pas besoin de w/h (taille par défaut), mais measuredW et measuredH restent obligatoires pour eux aussi
-- Ne JAMAIS écrire une clé sans sa valeur (ex: "measuredW","measuredH":"20" est INVALIDE) : chaque clé doit toujours être suivie de ":" puis de sa valeur avant la virgule suivante"""
+- Ne JAMAIS écrire une clé sans sa valeur (ex: "measuredW","measuredH":"20" est INVALIDE) : chaque clé doit toujours être suivie de ":" puis de sa valeur avant la virgule suivante
+
+NE JAMAIS FUSIONNER PLUSIEURS ÉLÉMENTS DISTINCTS EN UN SEUL CONTRÔLE :
+- INTERDIT d'inventer un séparateur ("|", "I", "/", "-", etc.) pour coller plusieurs textes qui sont visuellement distincts dans l'image en une seule valeur "text". Chaque texte qui a sa propre couleur, taille, poids de police, ou position clairement séparée est un contrôle séparé, avec son propre x/y.
+- Exemple concret À NE PAS FAIRE : {{"text":"Romande Energie SA I Déposer un relevé énergétique annuel"}} -- ce sont DEUX éléments (un petit lien coloré + un gros titre en dessous), donc DEUX contrôles distincts : un Link ET un Title/SubTitle, à des y différents.
+- Indicateur d'étapes numérotées (cercles "1 2 3" avec des labels comme "Saisie / Vérification / Transmission" en dessous, reliés par une ligne) : ne JAMAIS le rendre comme une seule ligne de texte avec des séparateurs. Décompose-le en plusieurs contrôles Label distincts (un par étape), au même y, avec des x différents et bien espacés selon leur position réelle dans l'image."""
 
 
 def _repair_dangling_keys(raw: str) -> str:
