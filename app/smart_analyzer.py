@@ -18,6 +18,21 @@ LABEL_H = 15    # hauteur d'un label standard
 
 def _get_lines(img, scale, min_conf=30):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Tesseract est nettement plus fiable quand le texte fait au moins
+    # ~25-30px de hauteur. Sur des screenshots réduits (webapp exportée en
+    # petite résolution, ex: 859x664), le texte des labels/petits éléments
+    # tombe souvent sous ce seuil et devient illisible ("cre a7" au lieu de
+    # "Numéro OFEN..."). On agrandit donc l'image avant OCR si elle est
+    # petite, uniquement pour la passe de reconnaissance de texte.
+    ocr_scale = 1.0
+    img_w_px = gray.shape[1]
+    if img_w_px < 1800:
+        ocr_scale = min(3.0, 1800 / img_w_px)
+    if ocr_scale > 1.01:
+        gray = cv2.resize(gray, None, fx=ocr_scale, fy=ocr_scale, interpolation=cv2.INTER_CUBIC)
+    total_scale = scale * ocr_scale
+
     data = pytesseract.image_to_data(
         gray, lang='fra+eng', config='--psm 6 --oem 3',
         output_type=pytesseract.Output.DICT
@@ -40,11 +55,11 @@ def _get_lines(img, scale, min_conf=30):
     for line in sorted(lines.values(), key=lambda l: l['top']):
         result.append({
             'text': ' '.join(line['words']),
-            'x':  int(line['left']   / scale),
-            'y':  int(line['top']    / scale),
-            'w':  int((line['right'] - line['left']) / scale),
-            'h':  int(line['h']      / scale),
-            'h_px': line['h'],  # hauteur en pixels réels
+            'x':  int(line['left']   / total_scale),
+            'y':  int(line['top']    / total_scale),
+            'w':  int((line['right'] - line['left']) / total_scale),
+            'h':  int(line['h']      / total_scale),
+            'h_px': int(line['h'] / ocr_scale),  # hauteur en pixels réels (image d'origine)
         })
     return result
 
@@ -300,25 +315,34 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
             controls.append(_make_ctrl(id_, "Label", lx, ly, props={"text": text}))
             id_ += 1
 
-    # Champs non encore associés
-    for k, inp in enumerate(inputs):
-        if k not in used_inputs:
-            tid = "TextArea" if inp['h'] > 50 else "TextInput"
-            controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h']))
-            id_ += 1
-
-    # Image / HRule : formes géométriques sans texte, ignorées par l'OCR
-    def _overlaps_existing(x, y, w, h):
+    # Aide : une zone chevauche-t-elle un contrôle déjà placé ? (évite les
+    # doublons : _detect_inputs() capte parfois le contour d'une simple
+    # ligne de texte -- titre, sous-titre, breadcrumb -- comme si c'était
+    # un vrai champ de saisie, ce qui créait un TextInput fantôme par-dessus
+    # chaque Title/SubTitle/Label déjà détecté par l'OCR)
+    def _overlaps_existing(x, y, w, h, min_ratio=0.35):
         for c in controls:
             cx, cy = int(c['x']), int(c['y'])
             cw = int(c.get('w', c['measuredW']))
             ch = int(c.get('h', c['measuredH']))
             ix = max(0, min(x + w, cx + cw) - max(x, cx))
             iy = max(0, min(y + h, cy + ch) - max(y, cy))
-            if ix * iy > 0.4 * min(w * h, cw * ch):
+            if ix * iy > min_ratio * min(w * h, cw * ch):
                 return True
         return False
 
+    # Champs non encore associés -- on ignore ceux qui chevauchent déjà un
+    # Title/SubTitle/Label/Link (contour de texte confondu avec un champ)
+    for k, inp in enumerate(inputs):
+        if k in used_inputs:
+            continue
+        if _overlaps_existing(inp['x'], inp['y'], inp['w'], inp['h']):
+            continue
+        tid = "TextArea" if inp['h'] > 50 else "TextInput"
+        controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h']))
+        id_ += 1
+
+    # Image / HRule : formes géométriques sans texte, ignorées par l'OCR
     for shape in _detect_shapes(img, scale):
         if _overlaps_existing(shape['x'], shape['y'], shape['w'], shape['h']):
             continue
