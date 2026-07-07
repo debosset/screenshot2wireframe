@@ -275,6 +275,19 @@
         jobId=d.job_id;
         const badge=document.getElementById('src-badge');
         badge.textContent = d.source==='groq' ? '🤖 Groq IA — llama-4-scout' : '🔍 OCR local';
+        if(key && d.source!=='groq'){
+          // Une clé a été fournie mais Groq n'a pas été utilisé -> diagnostic
+          if(d.groq_error){
+            err.textContent = 'Groq a échoué, retombé sur OCR local : ' + d.groq_error;
+            err.style.display='block';
+          } else if(!d.groq_key_received){
+            err.textContent = "La clé n'est pas arrivée au serveur (bug frontend) — regarde l'onglet Réseau du navigateur.";
+            err.style.display='block';
+          } else if(!d.groq_key_prefix_ok){
+            err.textContent = "La clé reçue par le serveur ne commence pas par 'gsk_' — vérifie qu'elle est complète.";
+            err.style.display='block';
+          }
+        }
         pbar.style.width='100%'; stat.textContent='Analyse terminée !';
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';

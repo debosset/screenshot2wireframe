@@ -80,13 +80,25 @@ async def analyze(
 
     try:
         api_key = (groq_api_key or "").strip()
+        groq_error = None
 
         if api_key.startswith("gsk_"):
             # ── Mode Groq Vision ─────────────────────────────────────────────
-            from .groq_vision import analyze_with_groq, extract_components
-            mockup_json = analyze_with_groq(str(upload_path), api_key, project_id=project_id or "0:1")
-            components = extract_components(mockup_json)
-            source = "groq"
+            try:
+                from .groq_vision import analyze_with_groq, extract_components
+                mockup_json = analyze_with_groq(str(upload_path), api_key, project_id=project_id or "0:1")
+                components = extract_components(mockup_json)
+                source = "groq"
+            except Exception as e:
+                # On ne plante plus silencieusement en OCR sans explication :
+                # l'erreur Groq (clé refusée, réseau, JSON invalide renvoyé
+                # par le modèle...) remonte dans la réponse pour comprendre
+                # pourquoi le badge affichait "OCR local" malgré une clé fournie.
+                groq_error = f"{type(e).__name__}: {e}"
+                from .smart_analyzer import smart_analyze
+                components = smart_analyze(str(upload_path))
+                mockup_json = None
+                source = "ocr"
         else:
             # ── Mode OCR fallback ────────────────────────────────────────────
             from .smart_analyzer import smart_analyze
@@ -101,6 +113,11 @@ async def analyze(
             "source": source,
             "components_count": len(components),
             "components": components,
+            # Diagnostic clé Groq (jamais la clé elle-même) : permet de voir
+            # immédiatement si la clé a été reçue et reconnue par le serveur.
+            "groq_key_received": bool(api_key),
+            "groq_key_prefix_ok": api_key.startswith("gsk_"),
+            "groq_error": groq_error,
         }
     finally:
         if upload_path.exists():
