@@ -160,6 +160,38 @@ def get_measured(tid: str, fallback_w: int = 100, fallback_h: int = 20) -> Tuple
     return MEASURED.get(tid, (fallback_w, fallback_h))
 
 
+def safe_int_str(value, default: int) -> str:
+    """
+    Convertit une valeur en entier puis en string, sans jamais planter.
+    Groq met parfois le nom d'une clé ou une valeur aberrante dans un champ
+    numérique (x/y/w/h/measuredW/measuredH) -- dans ce cas on retombe sur
+    `default` plutôt que de laisser une valeur invalide se propager jusqu'au
+    fichier .bmpr final.
+    """
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        try:
+            return str(int(float(value)))
+        except (TypeError, ValueError):
+            return str(default)
+
+
+_NUMERIC_FIELDS = {"x": 0, "y": 0, "w": 100, "h": 20, "measuredW": 100, "measuredH": 20}
+
+
+def sanitize_numeric_fields(components):
+    """Coerce x/y/w/h/measuredW/measuredH vers des entiers valides (en string)."""
+    fixed = []
+    for c in components:
+        c = dict(c)
+        for field, default in _NUMERIC_FIELDS.items():
+            if field in c:
+                c[field] = safe_int_str(c[field], default)
+        fixed.append(c)
+    return fixed
+
+
 def sanitize_components(components):
     """
     Mode sûr : passe chaque composant dans normalize_type_id() pour garantir

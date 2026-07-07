@@ -138,7 +138,7 @@ async def generate(
     pid = project_id or cached.get("project_id", "0:1")
 
     # ── Mode sûr : neutralise tout typeID que Balsamiq refuserait ─────────
-    from .balsamiq_components import sanitize_components
+    from .balsamiq_components import sanitize_components, sanitize_numeric_fields
     components, corrections = sanitize_components(components)
 
     if not mockup_json:
@@ -150,9 +150,12 @@ async def generate(
         # Chemin Groq : les contrôles bruts sont dans mockup_json, pas dans
         # `components` (qui n'est qu'une vue enrichie pour l'UI) — on les
         # sanitize aussi, sinon un NavBar/BreadCrumb/Pagination halluciné
-        # par le LLM passe tout droit et fait planter le collage.
+        # par le LLM passe tout droit et fait planter le collage, et on
+        # coerce aussi les champs numériques (Groq met parfois le nom
+        # d'une clé comme "measuredH" à la place d'un vrai nombre).
         raw_controls = mockup_json.get("mockup", {}).get("controls", {}).get("control", [])
         raw_controls, raw_corrections = sanitize_components(raw_controls)
+        raw_controls = sanitize_numeric_fields(raw_controls)
         mockup_json["mockup"]["controls"]["control"] = raw_controls
         corrections += raw_corrections
         mockup_json["projectID"] = pid

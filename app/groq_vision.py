@@ -217,6 +217,23 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     }
 
 
+def _safe_int(value, default):
+    """
+    Conversion int() qui ne plante jamais. Groq met parfois une valeur
+    aberrante (ex: le nom d'une clé "measuredH" au lieu d'un nombre, ou une
+    chaîne vide, ou un flottant "20.5") dans un champ censé être numérique --
+    dans ce cas on retombe sur `default` plutôt que de faire planter toute
+    l'analyse pour un seul contrôle mal formé.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return default
+
+
 def extract_components(mockup_json: Dict) -> List[Dict]:
     """Extourne la liste de composants pour l'affichage UI."""
     TYPE_LABELS = {
@@ -233,15 +250,17 @@ def extract_components(mockup_json: Dict) -> List[Dict]:
         tid = c.get("typeID", "Rectangle")
         props = c.get("properties", {})
         text = props.get("text", "") if isinstance(props, dict) else ""
+        measured_w = _safe_int(c.get("measuredW", 100), 100)
+        measured_h = _safe_int(c.get("measuredH", 20), 20)
         result.append({
             **c,
             "label": TYPE_LABELS.get(tid, f"▭ {tid}"),
             "description": str(text)[:60] if text else "",
-            "x": int(c.get("x", 0)),
-            "y": int(c.get("y", 0)),
-            "w": int(c.get("w", c.get("measuredW", 100))),
-            "h": int(c.get("h", c.get("measuredH", 20))),
-            "measuredW": int(c.get("measuredW", 100)),
-            "measuredH": int(c.get("measuredH", 20)),
+            "x": _safe_int(c.get("x", 0), 0),
+            "y": _safe_int(c.get("y", 0), 0),
+            "w": _safe_int(c.get("w", measured_w), measured_w),
+            "h": _safe_int(c.get("h", measured_h), measured_h),
+            "measuredW": measured_w,
+            "measuredH": measured_h,
         })
     return result
