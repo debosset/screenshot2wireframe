@@ -20,6 +20,14 @@
     .row input{padding:9px 12px;border:1px solid #d0cfc8;border-radius:8px;font-size:.85rem;color:#333;background:#fafaf7;outline:none;transition:border-color .2s}
     .row input:focus{border-color:#667eea}
     .row .sub{font-size:.73rem;color:#bbb}
+    /* Clé API */
+    .api-key-wrap{position:relative}
+    .api-key-wrap input{padding-right:80px;font-family:monospace}
+    .api-key-status{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.72rem;font-weight:600;border-radius:5px;padding:2px 8px}
+    .api-key-status.saved{background:#ecfdf5;color:#059669}
+    .api-key-status.unsaved{background:#fef3c7;color:#d97706}
+    .save-btn{background:none;border:none;cursor:pointer;font-size:.78rem;color:#667eea;font-weight:600;padding:0;text-decoration:underline}
+    .save-btn:hover{color:#3f51b5}
     /* Dropzone */
     #dropzone{border:2px dashed #d0cfc8;border-radius:14px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;background:#fafaf7}
     #dropzone.on{border-color:#667eea;background:#f0f0ff}
@@ -87,12 +95,25 @@
       </svg>
     </div>
     <div class="brand">Snap<span>Wire</span></div>
-    <p class="tagline">Screenshot → Wireframe Balsamiq · 100% local, sans IA</p>
+    <p class="tagline">Screenshot → Wireframe Balsamiq · OCR local, IA Groq en option</p>
   </div>
 
   <!-- Étape 1 -->
   <div class="card">
     <div class="card-title"><span class="step-badge">1</span> Configuration</div>
+
+    <!-- Clé Groq (optionnelle) -->
+    <div class="row">
+      <label>
+        Clé API Groq <span style="font-weight:400;color:#ccc;font-size:.75rem">(optionnel — vide = OCR local)</span>
+        <button class="save-btn" id="save-btn" onclick="saveKey()">💾 Sauvegarder</button>
+      </label>
+      <div class="api-key-wrap">
+        <input type="password" id="groq-key" placeholder="gsk_... (laisser vide pour l'OCR local)" autocomplete="off" spellcheck="false" oninput="onKeyChange()">
+        <span class="api-key-status" id="key-status"></span>
+      </div>
+      <span class="sub">Gratuit sur <strong>console.groq.com</strong> → API Keys · <span id="saved-hint"></span></span>
+    </div>
 
     <!-- Project ID -->
     <div class="row">
@@ -127,7 +148,7 @@
   <div class="card" id="analysis-card">
     <div class="card-title"><span class="step-badge">3</span> Composants détectés — vérifiez</div>
     <div class="source-info">
-      <span class="src-badge">🔍 OCR local — 100% sans IA</span>
+      <span class="src-badge" id="src-badge">🔍 OCR local</span>
       <span id="count-info" style="font-size:.82rem;color:#777"></span>
     </div>
     <div class="summary" id="summary"></div>
@@ -149,6 +170,48 @@
 
   <script>
     let file=null, jobId=null, clipJson=null;
+    const STORAGE_KEY = 'snapwire_groq_key';
+
+    // ── Gestion clé API (optionnelle) ───────────────────────────────────────
+    function loadSavedKey(){
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if(saved){
+        document.getElementById('groq-key').value = saved;
+        setKeyStatus('saved');
+        document.getElementById('saved-hint').textContent = 'Clé sauvegardée ✓';
+      }
+    }
+
+    function saveKey(){
+      const key = document.getElementById('groq-key').value.trim();
+      if(!key){ localStorage.removeItem(STORAGE_KEY); setKeyStatus(''); document.getElementById('saved-hint').textContent=''; return; }
+      localStorage.setItem(STORAGE_KEY, key);
+      setKeyStatus('saved');
+      document.getElementById('saved-hint').textContent = 'Clé sauvegardée ✓';
+      document.getElementById('save-btn').textContent = '✓ Sauvegardée';
+      setTimeout(()=>{ document.getElementById('save-btn').textContent = '💾 Sauvegarder'; }, 2000);
+    }
+
+    function onKeyChange(){
+      const key = document.getElementById('groq-key').value.trim();
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if(key && key !== saved) setKeyStatus('unsaved');
+      else if(key && key === saved) setKeyStatus('saved');
+      else setKeyStatus('');
+    }
+
+    function setKeyStatus(status){
+      const el = document.getElementById('key-status');
+      if(status === 'saved'){ el.textContent='Sauvegardée'; el.className='api-key-status saved'; }
+      else if(status === 'unsaved'){ el.textContent='Non sauvegardée'; el.className='api-key-status unsaved'; }
+      else { el.textContent=''; el.className='api-key-status'; }
+    }
+
+    // Clé optionnelle : vide -> OCR local, remplie -> Groq. Ne bloque JAMAIS
+    // l'analyse (contrairement à l'ancienne version qui exigeait une clé).
+    function getKey(){
+      return document.getElementById('groq-key').value.trim() || localStorage.getItem(STORAGE_KEY) || '';
+    }
 
     // ── Upload ───────────────────────────────────────────────────────────────
     const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),
@@ -193,19 +256,25 @@
       document.getElementById('analysis-card').style.display='none';
       prog.style.display='block';
 
-      const steps=[[15,"Lecture de l'image…"],[40,"Reconnaissance du texte (OCR)…"],[70,"Détection des composants…"],[90,"Finalisation…"]];
+      const key = getKey();
+      const steps = key
+        ? [[15,"Envoi à Groq IA…"],[40,"Analyse de l'interface…"],[70,"Détection des composants…"],[90,"Finalisation…"]]
+        : [[15,"Lecture de l'image…"],[40,"Reconnaissance du texte (OCR)…"],[70,"Détection des composants…"],[90,"Finalisation…"]];
       let si=0;
       const t=setInterval(()=>{if(si<steps.length){pbar.style.width=steps[si][0]+'%';stat.textContent=steps[si][1];si++}},1500);
 
       try{
         const fd=new FormData();
         fd.append('file',file);
+        if(key) fd.append('groq_api_key', key);
         fd.append('project_id', document.getElementById('pid').value.trim()||'0:1');
         const r=await fetch('/analyze',{method:'POST',body:fd});
         const d=await r.json();
         clearInterval(t);
         if(!r.ok) throw new Error(d.detail||'Erreur serveur');
         jobId=d.job_id;
+        const badge=document.getElementById('src-badge');
+        badge.textContent = d.source==='groq' ? '🤖 Groq IA — llama-4-scout' : '🔍 OCR local';
         pbar.style.width='100%'; stat.textContent='Analyse terminée !';
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';
@@ -264,6 +333,8 @@
       setTimeout(()=>{ copyBtn.textContent='📋 Copier JSON'; copyBtn.classList.remove('ok'); }, 2500);
     };
 
+    // ── Init ──────────────────────────────────────────────────────────────────
+    loadSavedKey();
   </script>
 </body>
 </html>
