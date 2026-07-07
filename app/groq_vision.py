@@ -138,10 +138,18 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        # Filet de sécurité : Groq a généré un JSON avec des guillemets
-        # internes non échappés (ex: texte citant « Romande Énergie SA »).
-        # On tente une réparation ciblée avant d'abandonner.
-        parsed = json.loads(_repair_unescaped_quotes(raw))
+        try:
+            # Filet de sécurité : Groq a généré un JSON avec des guillemets
+            # internes non échappés (ex: texte citant « Romande Énergie SA »).
+            parsed = json.loads(_repair_unescaped_quotes(raw))
+        except json.JSONDecodeError as e2:
+            # La réparation n'a pas suffi -- on remonte un extrait du JSON
+            # brut autour de l'erreur pour diagnostiquer précisément la
+            # vraie cause plutôt que de deviner à l'aveugle.
+            start = max(0, e2.pos - 80)
+            end = min(len(raw), e2.pos + 80)
+            snippet = raw[start:end]
+            raise ValueError(f"{e2} | extrait autour de l'erreur: ...{snippet!r}...") from e2
 
     controls = parsed.get("controls", [])
     mockup_w = parsed.get("mockupW", "1000")
