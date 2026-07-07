@@ -215,11 +215,46 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
     lines  = _get_lines(img, scale)
     inputs = _detect_inputs(img, scale)
 
+    # Une ligne de texte OCR peut être soit un label à côté d'un champ, soit
+    # la VALEUR affichée à l'intérieur d'un champ (ex: "CHE-473.889.808"
+    # dans le champ "Numéro IDE"). Sans distinction, on créait une boîte
+    # vide + un Label flottant séparé au même endroit, au lieu d'un seul
+    # champ portant son propre texte. On repère ici ces lignes "valeur".
+    value_line_ids = {}   # id(line) -> index de la zone dans `inputs`
+    zone_value_text = {}  # index de zone -> texte à mettre dans le champ
+    for k, inp in enumerate(inputs):
+        best_line, best_containment = None, 0
+        zone_area = inp['w'] * inp['h']
+        for ln in lines:
+            ix = min(ln['x']+ln['w'], inp['x']+inp['w']) - max(ln['x'], inp['x'])
+            iy = min(ln['y']+ln['h'], inp['y']+inp['h']) - max(ln['y'], inp['y'])
+            if ix <= 0 or iy <= 0:
+                continue
+            line_area = ln['w'] * ln['h']
+            if line_area <= 0:
+                continue
+            # La zone doit avoir une vraie marge par rapport au texte : un
+            # champ réel est nettement plus grand que la valeur qu'il
+            # contient, contrairement à l'artefact "texte = sa propre boîte"
+            # (le contour capté autour d'un simple titre/label), où la zone
+            # colle presque exactement au texte (ratio proche de 1).
+            if zone_area < 2.5 * line_area:
+                continue
+            containment = (ix * iy) / line_area  # part de la ligne dans la zone
+            if containment > 0.7 and containment > best_containment:
+                best_containment, best_line = containment, ln
+        if best_line is not None:
+            value_line_ids[id(best_line)] = k
+            zone_value_text[k] = best_line['text']
+
     controls = []
     id_ = 0
     used_inputs = set()
 
     for line in lines:
+        if id(line) in value_line_ids:
+            continue  # texte-valeur d'un champ, traité avec la zone elle-même
+
         text = line['text']
         lx, ly, lw, lh = line['x'], line['y'], line['w'], line['h']
         h_px = line['h_px']
@@ -315,7 +350,8 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
                 k, inp = best_inp
                 used_inputs.add(k)
                 tid = "TextArea" if inp['h'] > 50 else "TextInput"
-                controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h']))
+                value_props = {"text": zone_value_text[k]} if k in zone_value_text else None
+                controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h'], props=value_props))
                 id_ += 1
 
         # Lien
@@ -353,7 +389,8 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
         if _overlaps_existing(inp['x'], inp['y'], inp['w'], inp['h']):
             continue
         tid = "TextArea" if inp['h'] > 50 else "TextInput"
-        controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h']))
+        value_props = {"text": zone_value_text[k]} if k in zone_value_text else None
+        controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h'], props=value_props))
         id_ += 1
 
     # Image / HRule : formes géométriques sans texte, ignorées par l'OCR
