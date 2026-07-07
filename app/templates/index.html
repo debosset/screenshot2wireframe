@@ -22,7 +22,10 @@
     .row .sub{font-size:.73rem;color:#bbb}
     /* Clé API */
     .api-key-wrap{position:relative}
-    .api-key-wrap input{padding-right:80px;font-family:monospace}
+    .api-key-wrap input{padding-right:110px;font-family:monospace}
+    .masked-input{-webkit-text-security:disc;text-security:disc}
+    .toggle-key-btn{position:absolute;right:74px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.85rem;opacity:.55;padding:2px 4px}
+    .toggle-key-btn:hover{opacity:1}
     .api-key-status{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.72rem;font-weight:600;border-radius:5px;padding:2px 8px}
     .api-key-status.saved{background:#ecfdf5;color:#059669}
     .api-key-status.unsaved{background:#fef3c7;color:#d97706}
@@ -109,7 +112,8 @@
         <button class="save-btn" id="save-btn" onclick="saveKey()">💾 Sauvegarder</button>
       </label>
       <div class="api-key-wrap">
-        <input type="password" id="groq-key" placeholder="gsk_... (laisser vide pour l'OCR local)" autocomplete="off" spellcheck="false" oninput="onKeyChange()">
+        <input type="text" id="groq-key" class="masked-input" placeholder="gsk_... (laisser vide pour l'OCR local)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore oninput="onKeyChange()">
+        <button type="button" class="toggle-key-btn" id="toggle-key-btn" onclick="toggleKeyVisibility()" title="Afficher/masquer">👁</button>
         <span class="api-key-status" id="key-status"></span>
       </div>
       <span class="sub">Gratuit sur <strong>console.groq.com</strong> → API Keys · <span id="saved-hint"></span></span>
@@ -205,6 +209,13 @@
       if(status === 'saved'){ el.textContent='Sauvegardée'; el.className='api-key-status saved'; }
       else if(status === 'unsaved'){ el.textContent='Non sauvegardée'; el.className='api-key-status unsaved'; }
       else { el.textContent=''; el.className='api-key-status'; }
+    }
+
+    function toggleKeyVisibility(){
+      const inp = document.getElementById('groq-key');
+      const btn = document.getElementById('toggle-key-btn');
+      inp.classList.toggle('masked-input');
+      btn.textContent = inp.classList.contains('masked-input') ? '👁' : '🙈';
     }
 
     // Clé optionnelle : vide -> OCR local, remplie -> Groq. Ne bloque JAMAIS
