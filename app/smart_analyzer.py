@@ -3,29 +3,17 @@ Analyse intelligente : OCR tesseract → composants Balsamiq avec bon espacement
 Pattern confirmé fonctionnel : label (GAP=18px) → champ.
 """
 import cv2
+import numpy as np
 import pytesseract
 import re
 from typing import List, Dict, Any
+
+from .balsamiq_components import MEASURED, DEFAULT_MEASURED
 
 GAP = 18        # espace entre label et champ
 FIELD_H = 28    # hauteur standard d'un TextInput
 HINT_H = 14     # hauteur d'un texte hint
 LABEL_H = 15    # hauteur d'un label standard
-
-# Tailles measuredW/H par défaut Balsamiq
-MEASURED = {
-    "Title":       (300, 30),
-    "SubTitle":    (250, 24),
-    "Label":       (100, 17),
-    "Link":        (150, 17),
-    "TextInput":   (79,  27),
-    "TextArea":    (200, 100),
-    "Button":      (61,  27),
-    "ButtonBar":   (159, 27),
-    "CheckBox":    (100, 23),
-    "RadioButton": (97,  23),
-    "HRule":       (100, 10),
-}
 
 
 def _get_lines(img, scale, min_conf=30):
@@ -60,6 +48,68 @@ def _get_lines(img, scale, min_conf=30):
         })
     return result
 
+
+def _detect_shapes(img, scale):
+    """
+    Détecte les Image et HRule via OpenCV (formes géométriques, pas de texte).
+    Réutilise/adapte les heuristiques d'opencv_analyzer.py (jusqu'ici du code
+    mort, jamais branché nulle part).
+    """
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(blurred, 30, 100)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    dilated = cv2.dilate(edges, kernel, iterations=2)
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    img_h, img_w = img.shape[:2]
+    shapes = []
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        if w < 10 or h < 2:
+            continue
+        bbox_area = w * h
+        if bbox_area > img_w * img_h * 0.9:
+            continue
+        ratio = w / h if h > 0 else 1
+
+        # HRule : trait fin et très large (séparateur horizontal). On filtre
+        # sur l'aire du rectangle englobant (bbox_area), pas contourArea :
+        # pour une ligne quasi-droite, contourArea renvoie ~0 (polygone
+        # dégénéré) et la ligne serait rejetée à tort par un seuil d'aire.
+        if ratio > 15 and h <= 10:
+            shapes.append({
+                'x': int(x / scale), 'y': int(y / scale),
+                'w': int(w / scale), 'h': int(h / scale), 'kind': 'HRule',
+            })
+            continue
+
+        if h < 10:
+            continue
+
+        # Image : bloc rectangulaire large, peu de détails internes (faible
+        # densité de contours) -> probablement une photo/placeholder, pas du
+        # texte ni un bouton
+        if 0.4 <= ratio <= 2.5 and bbox_area > 8000:
+            area = cv2.contourArea(cnt)
+            if area < 400:
+                continue
+            roi = img[y:y + h, x:x + w]
+            roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) if len(roi.shape) == 3 else roi
+            roi_edges = cv2.Canny(roi_gray, 50, 150)
+            density = np.count_nonzero(roi_edges) / bbox_area
+            if density < 0.03:
+                shapes.append({
+                    'x': int(x / scale), 'y': int(y / scale),
+                    'w': int(w / scale), 'h': int(h / scale), 'kind': 'Image',
+                })
+    return shapes
+
+
+def _has_dropdown_marker(text):
+    """Détecte un marqueur de liste déroulante (▼ ▾ ⌄ v en fin de texte)."""
+    text = text.strip()
+    return bool(re.search(r'[▼▾⌄∨]\s*$', text)) or bool(re.match(r'^.{1,40}\s+v$', text, re.IGNORECASE))
 
 def _detect_inputs(img, scale):
     """Détecte les zones de saisie via OpenCV."""
@@ -131,7 +181,7 @@ def _make_ctrl(id_, tid, x, y, w=None, h=None, props=None):
         "x": str(x),
         "y": str(y),
     }
-    if tid in {"TextInput","TextArea","ButtonBar","Rectangle","FieldSet","Image","HRule"}:
+    if tid in {"TextInput","TextArea","ButtonBar","Rectangle","FieldSet","Image","HRule","ComboBox"}:
         if w: c["w"] = str(w)
         if h and h != mh: c["h"] = str(h)
     if props:
@@ -161,15 +211,29 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
 
         # ── Classifier la ligne ──────────────────────────────────────────────
 
-        # Checkbox
+        # ComboBox : ligne se terminant par un marqueur de liste déroulante
+        # (ex: "Pays ▼", "Ville v") -> c'est la valeur affichée DANS le
+        # ComboBox, pas un label au-dessus d'un champ
+        if _has_dropdown_marker(text) and h_px < 30:
+            controls.append(_make_ctrl(id_, "ComboBox", lx, ly, w=max(lw, 140), props={"text": text}))
+            id_ += 1
+            continue
+
+        # Checkbox — symboles unicode OU notation Balsamiq officielle [x] / [ ]
         if text.startswith(('☑', '✓', '☐', '□', '✔')) or re.match(r'^[©@®]\s', text):
             checked = text[0] in ('☑','✓','✔','©','@')
             label = re.sub(r'^[☑✓☐□✔©@®]\s*', '', text).strip()
             controls.append(_make_ctrl(id_, "CheckBox", lx, ly, props={"text": label, "selected": checked}))
             id_ += 1
             continue
+        m_cb = re.match(r'^\[\s*([xX]?)\s*\]\s*(.*)$', text)
+        if m_cb:
+            controls.append(_make_ctrl(id_, "CheckBox", lx, ly,
+                props={"text": m_cb.group(2).strip(), "selected": bool(m_cb.group(1))}))
+            id_ += 1
+            continue
 
-        # RadioButton
+        # RadioButton — symboles unicode OU notation Balsamiq officielle (o) / ()
         if re.match(r'^[○●◉O©]\s', text) or '○' in text[:3] or '●' in text[:3]:
             parts = re.split(r'\s+[○●◉O©]\s+', text)
             for j, part in enumerate(parts):
@@ -178,6 +242,12 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
                     selected = j == 0 and text[0] in ('●','◉')
                     controls.append(_make_ctrl(id_, "RadioButton", lx + j*200, ly, props={"text": part, "selected": selected}))
                     id_ += 1
+            continue
+        m_rb = re.match(r'^\(\s*([oO]?)\s*\)\s*(.*)$', text)
+        if m_rb:
+            controls.append(_make_ctrl(id_, "RadioButton", lx, ly,
+                props={"text": m_rb.group(2).strip(), "selected": bool(m_rb.group(1))}))
+            id_ += 1
             continue
 
         # Hint (texte gris d'aide) — Label petit
@@ -237,6 +307,24 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
             controls.append(_make_ctrl(id_, tid, inp['x'], inp['y'], w=inp['w'], h=inp['h']))
             id_ += 1
 
+    # Image / HRule : formes géométriques sans texte, ignorées par l'OCR
+    def _overlaps_existing(x, y, w, h):
+        for c in controls:
+            cx, cy = int(c['x']), int(c['y'])
+            cw = int(c.get('w', c['measuredW']))
+            ch = int(c.get('h', c['measuredH']))
+            ix = max(0, min(x + w, cx + cw) - max(x, cx))
+            iy = max(0, min(y + h, cy + ch) - max(y, cy))
+            if ix * iy > 0.4 * min(w * h, cw * ch):
+                return True
+        return False
+
+    for shape in _detect_shapes(img, scale):
+        if _overlaps_existing(shape['x'], shape['y'], shape['w'], shape['h']):
+            continue
+        controls.append(_make_ctrl(id_, shape['kind'], shape['x'], shape['y'], w=shape['w'], h=shape['h']))
+        id_ += 1
+
     # Boutons navigation (Précédent/Suivant)
     for line in lines:
         text = line['text']
@@ -259,6 +347,7 @@ def smart_analyze(image_path: str) -> List[Dict[str, Any]]:
         "Link": "🔗 Lien", "TextInput": "✏️ Champ texte", "TextArea": "📄 Zone texte",
         "Button": "🔘 Bouton", "ButtonBar": "🔘 Barre boutons",
         "CheckBox": "☑️ Case à cocher", "RadioButton": "🔘 Radio",
+        "ComboBox": "🔽 Liste déroulante", "Image": "🖼️ Image", "HRule": "— Séparateur",
     }
     result = []
     for c in controls:

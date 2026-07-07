@@ -9,28 +9,54 @@ from pathlib import Path
 from typing import List, Dict, Any
 from groq import Groq
 
+from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED
 
-SYSTEM_PROMPT = """Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne UNIQUEMENT un JSON valide.
+# Liste complète et toujours à jour des typeID valides (source unique :
+# balsamiq_components.py). On ne restreint plus l'IA à un sous-ensemble —
+# elle a accès à tous les composants Balsamiq connus. La sanitation dans
+# balsamiq_components.sanitize_components() reste un filet de sécurité qui
+# corrige les rares hallucinations, elle ne limite pas ce que l'IA peut choisir.
+_TYPE_ID_LIST = ", ".join(sorted(VALID_TYPE_IDS))
+
+SYSTEM_PROMPT = f"""Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne UNIQUEMENT un JSON valide.
 
 RÈGLES STRICTES :
 - Réponds UNIQUEMENT avec du JSON brut, sans markdown, sans explication, sans ```
-- Détecte TOUS les éléments visibles de haut en bas
-- Utilise ces typeIDs exacts : Title, SubTitle, Label, Link, TextInput, TextArea, Button, ButtonBar, CheckBox, RadioButton, ComboBox, Image, Rectangle, HRule, NavBar, TabBar, BreadCrumb, Pagination, DataGrid
+- Détecte TOUS les éléments visibles de haut en bas, y compris les éléments moins courants (Accordion, Tree, Menu, MenuBar, DataGrid, ProgressBar, Tooltip, TagCloud, Calendar, graphiques, etc.) quand ils sont présents à l'écran — ne te limite pas aux formulaires basiques.
+- Choisis le typeID le plus PRÉCIS possible parmi la liste ci-dessous plutôt qu'un générique (ex : un menu déroulant est un "ComboBox" pas un "Rectangle", une barre de progression est un "ProgressBar" pas un "HRule").
+- Voici TOUS les typeIDs valides dans Balsamiq (utilise exclusivement ceux-ci, respecte la casse exacte) :
+  {_TYPE_ID_LIST}
+- Cas fréquents à bien mapper :
+  - barre de navigation horizontale (liens en haut de page) -> "LinkBar" (jamais "NavBar", ça n'existe pas)
+  - fil d'Ariane -> "BreadCrumbs" au pluriel (jamais "BreadCrumb")
+  - pagination -> pas de contrôle natif dédié, utilise "ButtonBar"
+  - tableau de données / liste de résultats -> "DataGrid"
+  - liste verticale d'éléments simples -> "List"
+  - arborescence (fichiers, catégories imbriquées) -> "Tree"
+  - menu déroulant / select -> "ComboBox"
+  - menu contextuel ou latéral -> "Menu" ou "MenuBar" selon l'orientation
+  - onglets -> "TabBar"
+  - accordéon / sections repliables -> "Accordion"
+  - champ de recherche -> "SearchBox"
+  - sélecteur de date -> "DateChooser"
+  - icône seule -> "Icon" ; icône + texte -> "IconLabel"
+  - groupe de champs encadré -> "FieldSet"
+  - bloc de texte long (paragraphe) -> "Paragraph" (pas "Label", réservé aux textes courts)
 - Les coordonnées x/y/w/h sont en base 1000px de large (hauteur proportionnelle)
 - ID commence à 0, zOrder identique à ID
 - Tous les champs sont des strings
 
 FORMAT EXACT :
-{
+{{
   "controls": [
-    {"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{"text":"Mon titre"}},
-    {"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{"text":"Nom"}},
-    {"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400","properties":{"text":""}},
-    {"ID":"3","typeID":"CheckBox","zOrder":"3","measuredW":"100","measuredH":"23","x":"50","y":"120","properties":{"text":"Option","selected":true}}
+    {{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{{"text":"Mon titre"}}}},
+    {{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{{"text":"Nom"}}}},
+    {{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400","properties":{{"text":""}}}},
+    {{"ID":"3","typeID":"CheckBox","zOrder":"3","measuredW":"100","measuredH":"23","x":"50","y":"120","properties":{{"text":"Option","selected":true}}}}
   ],
   "mockupW": "1000",
   "mockupH": "800"
-}
+}}
 
 IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
