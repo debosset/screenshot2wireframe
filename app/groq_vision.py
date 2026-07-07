@@ -69,33 +69,36 @@ IMPORTANT pour le placement :
 
 def _repair_unescaped_quotes(raw: str) -> str:
     """
-    Répare les guillemets internes non échappés dans les valeurs de la clé
-    "text" -- Groq génère parfois du texte citant des guillemets (ex: « Romande
-    Énergie SA ») sans les échapper, ce qui casse le JSON strict avec une
-    erreur du type "Expecting ':' delimiter" au milieu d'une ligne.
-    Ne touche qu'aux valeurs "text":"..." ; laisse le reste du JSON intact.
+    Répare les guillemets internes non échappés dans N'IMPORTE QUELLE chaîne
+    JSON (clé ou valeur) -- Groq génère parfois du texte citant des
+    guillemets (ex: « Romande Énergie SA ») sans les échapper, ce qui casse
+    le JSON strict avec une erreur "Expecting ':' delimiter" au milieu d'une
+    ligne. Contrairement à une v1 qui ne ciblait que la clé "text", celle-ci
+    est générique : elle suit une chaîne dès son guillemet ouvrant et ne la
+    referme que sur un guillemet suivi d'un vrai délimiteur JSON (, : } ]).
+    Tout autre guillemet rencontré entre-temps est échappé.
     """
     out = []
     i, n = 0, len(raw)
+    in_string = False
     while i < n:
-        m = re.match(r'"text"\s*:\s*"', raw[i:]) if raw[i] == '"' else None
-        if m:
-            out.append(raw[i:i + m.end()])
-            i += m.end()
-            while i < n:
-                ch = raw[i]
-                if ch == '\\' and i + 1 < n:
-                    out.append(raw[i:i + 2]); i += 2; continue
-                if ch == '"':
-                    j = i + 1
-                    while j < n and raw[j] in ' \t\r\n':
-                        j += 1
-                    if j < n and raw[j] in ',}':
-                        out.append('"'); i += 1; break
-                    out.append('\\"'); i += 1; continue
-                out.append(ch); i += 1
+        ch = raw[i]
+        if not in_string:
+            out.append(ch)
+            if ch == '"':
+                in_string = True
+            i += 1
             continue
-        out.append(raw[i]); i += 1
+        if ch == '\\' and i + 1 < n:
+            out.append(raw[i:i + 2]); i += 2; continue
+        if ch == '"':
+            j = i + 1
+            while j < n and raw[j] in ' \t\r\n':
+                j += 1
+            if j >= n or raw[j] in ',:}]':
+                out.append('"'); in_string = False; i += 1; continue
+            out.append('\\"'); i += 1; continue
+        out.append(ch); i += 1
     return ''.join(out)
 
 
