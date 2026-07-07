@@ -70,15 +70,32 @@ IMPORTANT pour le placement :
 
 def _repair_dangling_keys(raw: str) -> str:
     """
-    Répare les clés sans valeur que Groq génère parfois, ex:
-    '"measuredW","measuredH":"20"' -- la valeur de "measuredW" a été
-    complètement oubliée, laissant une clé orpheline suivie directement
-    d'une virgule au lieu de ":valeur",. On supprime la clé orpheline
-    (nos valeurs par défaut prennent le relais en aval) plutôt que
-    d'essayer de deviner une valeur.
+    Répare deux variantes du même bug Groq -- une clé suivie d'une virgule
+    au lieu d'un ':valeur' :
+
+    Cas A -- valeur complètement oubliée, ce qui suit est la clé suivante :
+        '"measuredW","measuredH":"20"'  ->  '"measuredH":"20"'
+        (on supprime la clé orpheline ; nos defaults en aval prennent le relais)
+
+    Cas B -- la valeur est bien là, mais le ':' a été remplacé par une ',' :
+        '"y","270"'  ->  '"y":"270"'
+        (on réinsère le ':' manquant)
+
+    On distingue les deux en regardant ce qui suit la chaîne candidate : si
+    elle est elle-même suivie d'un ':', c'est la clé suivante (cas A) ; sinon
+    c'est la valeur du champ courant (cas B).
     """
-    pattern = re.compile(r'(?<![:\[])(\s*)"([A-Za-z_][A-Za-z0-9_]*)"(\s*),(?=\s*")')
-    return pattern.sub('', raw)
+    pattern = re.compile(
+        r'(?<![:\[])"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*(?=([,:}\]]))'
+    )
+
+    def repl(m):
+        key, val, nextch = m.group(1), m.group(2), m.group(3)
+        if nextch == ':':
+            return f'"{val}"'          # cas A : `val` est en fait la clé suivante
+        return f'"{key}":"{val}"'      # cas B : deux-points manquant réinséré
+
+    return pattern.sub(repl, raw)
 
 
 def _repair_unescaped_quotes(raw: str) -> str:
