@@ -67,6 +67,19 @@ IMPORTANT pour le placement :
 - Button, Label, CheckBox, RadioButton n'ont PAS de w/h (taille par défaut)"""
 
 
+def _repair_dangling_keys(raw: str) -> str:
+    """
+    Répare les clés sans valeur que Groq génère parfois, ex:
+    '"measuredW","measuredH":"20"' -- la valeur de "measuredW" a été
+    complètement oubliée, laissant une clé orpheline suivie directement
+    d'une virgule au lieu de ":valeur",. On supprime la clé orpheline
+    (nos valeurs par défaut prennent le relais en aval) plutôt que
+    d'essayer de deviner une valeur.
+    """
+    pattern = re.compile(r'(?<![:\[])(\s*)"([A-Za-z_][A-Za-z0-9_]*)"(\s*),(?=\s*")')
+    return pattern.sub('', raw)
+
+
 def _repair_unescaped_quotes(raw: str) -> str:
     """
     Répare les guillemets internes non échappés dans N'IMPORTE QUELLE chaîne
@@ -138,18 +151,24 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        try:
-            # Filet de sécurité : Groq a généré un JSON avec des guillemets
-            # internes non échappés (ex: texte citant « Romande Énergie SA »).
-            parsed = json.loads(_repair_unescaped_quotes(raw))
-        except json.JSONDecodeError as e2:
-            # La réparation n'a pas suffi -- on remonte un extrait du JSON
+        for repair_fn in (_repair_dangling_keys, _repair_unescaped_quotes,
+                          lambda s: _repair_unescaped_quotes(_repair_dangling_keys(s))):
+            try:
+                parsed = json.loads(repair_fn(raw))
+                break
+            except json.JSONDecodeError:
+                continue
+        if parsed is None:
+            # Aucune réparation n'a suffi -- on remonte un extrait du JSON
             # brut autour de l'erreur pour diagnostiquer précisément la
             # vraie cause plutôt que de deviner à l'aveugle.
-            start = max(0, e2.pos - 80)
-            end = min(len(raw), e2.pos + 80)
-            snippet = raw[start:end]
-            raise ValueError(f"{e2} | extrait autour de l'erreur: ...{snippet!r}...") from e2
+            try:
+                json.loads(raw)
+            except json.JSONDecodeError as e2:
+                start = max(0, e2.pos - 80)
+                end = min(len(raw), e2.pos + 80)
+                snippet = raw[start:end]
+                raise ValueError(f"{e2} | extrait autour de l'erreur: ...{snippet!r}...") from e2
 
     controls = parsed.get("controls", [])
     mockup_w = parsed.get("mockupW", "1000")
