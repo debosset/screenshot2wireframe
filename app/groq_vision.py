@@ -45,8 +45,9 @@ JSON_SCHEMA = {
                     "h": {"type": "integer"},
                     "text": {"type": "string"},
                     "selected": {"type": "boolean"},
+                    "fillColor": {"type": "string"},
                 },
-                "required": ["id", "typeID", "x", "y", "w", "h", "text", "selected"],
+                "required": ["id", "typeID", "x", "y", "w", "h", "text", "selected", "fillColor"],
                 "additionalProperties": False,
             },
         },
@@ -84,6 +85,17 @@ RÈGLES :
 - "id" est un entier séquentiel commençant à 0.
 - "text" est le texte affiché par le contrôle (chaîne vide "" si aucun texte, ex: HRule, Image).
 - "selected" est un booléen, pertinent uniquement pour CheckBox/RadioButton (true si coché/sélectionné) ; mets false pour tous les autres types.
+- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un contrôle "Rectangle" que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image (ex: bandeau vert en haut de page, bloc gris derrière un titre). Laisse "" (vide) pour tous les autres contrôles, et n'ajoute PAS de Rectangle coloré si tu n'es pas sûr de la couleur exacte. Positionne ce Rectangle en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
+
+NE JAMAIS INVENTER D'ÉLÉMENTS QUI NE SONT PAS DANS L'IMAGE :
+- INTERDIT d'ajouter un menu, une barre de navigation, des liens ou tout élément que tu ne vois PAS explicitement dans le screenshot. Si tu hésites entre "il y a peut-être un menu ici" et "je ne suis pas sûr", NE L'AJOUTE PAS.
+- Erreur déjà observée à éviter : ajouter un faux menu "Home | Products | Company | Blog" qui n'existait pas du tout dans l'image source. Chaque contrôle doit correspondre à quelque chose de RÉELLEMENT visible.
+
+ÉVITER LES CHEVAUCHEMENTS :
+- Dans les zones denses (ex: coin en haut à droite avec un nom d'utilisateur sur 2 lignes, ou plusieurs liens groupés), assure-toi que les coordonnées x/y de chaque contrôle ne se chevauchent pas avec un autre. Deux textes empilés verticalement (ex: "Romande Énergie SA" au-dessus de "Adrien De Bosset") doivent avoir un y clairement différent (au moins measuredH + 3px d'écart), jamais le même y.
+
+TITRES DE SECTION :
+- Un titre de section (texte en gras, nettement plus grand que le texte de formulaire autour, généralement seul sur sa ligne, ex: "Identification de l'entité") est TOUJOURS un "SubTitle" ou un "Title", JAMAIS un "Label" -- même si son y est proche d'autres labels de formulaire. Le Label est réservé aux petits textes de formulaire (ex: "Nom", "Raison sociale").
 
 IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
@@ -259,6 +271,13 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
             control["h"] = str(h)
         if tid in ("CheckBox", "RadioButton"):
             control["properties"]["selected"] = bool(fc.get("selected", False))
+        if tid == "Rectangle":
+            hexcolor = (fc.get("fillColor") or "").strip().lstrip("#")
+            if len(hexcolor) == 6:
+                try:
+                    control["properties"]["color"] = str(int(hexcolor, 16))
+                except ValueError:
+                    pass
         controls.append(control)
 
     import uuid
