@@ -96,7 +96,7 @@
       </svg>
     </div>
     <div class="brand">Snap<span>Wire</span></div>
-    <p class="tagline">Screenshot → Wireframe Balsamiq · OCR local, IA Groq en option</p>
+    <p class="tagline">Screenshot → Wireframe Balsamiq</p>
   </div>
 
   <!-- Étape 1 -->
@@ -106,7 +106,7 @@
     <!-- Clé Groq (optionnelle) -->
     <div class="row">
       <label>
-        Clé API Groq <span style="font-weight:400;color:#ccc;font-size:.75rem">(optionnel — vide = OCR local)</span>
+        Clé API Groq
         <button class="save-btn" id="save-btn" onclick="saveKey()">💾 Sauvegarder</button>
       </label>
       <div class="api-key-wrap">
@@ -117,12 +117,7 @@
       <span class="sub">Gratuit sur <strong>console.groq.com</strong> → API Keys · <span id="saved-hint"></span></span>
     </div>
 
-    <!-- Project ID -->
-    <div class="row">
-      <label>Project ID Balsamiq <span style="font-weight:400;color:#ccc;font-size:.75rem">(optionnel)</span></label>
-      <input type="text" id="pid" placeholder="ex: 2178941824:2178942175" spellcheck="false">
-      <span class="sub">Visible dans l'URL de votre projet Balsamiq</span>
-    </div>
+    <input type="hidden" id="pid" value="">
 
     <div class="card-title" style="margin-top:6px"><span class="step-badge">2</span> Screenshot</div>
 
