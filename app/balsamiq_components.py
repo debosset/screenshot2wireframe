@@ -143,16 +143,16 @@ DEFAULT_MEASURED: Tuple[int, int] = (100, 20)
 _CHAR_WIDTH = {
     "Title": 26,
     "SubTitle": 14,
-    "Label": 7,
-    "Link": 7,
-    "IconLabel": 7,
-    "Tooltip": 7,
-    "Button": 8,
-    "MultilineButton": 8,
-    "ButtonBar": 8,
-    "SearchBox": 7,
-    "ComboBox": 7,
-    "BreadCrumbs": 7,
+    "Label": 13,
+    "Link": 13,
+    "IconLabel": 13,
+    "Tooltip": 13,
+    "Button": 13,
+    "MultilineButton": 13,
+    "ButtonBar": 13,
+    "SearchBox": 13,
+    "ComboBox": 13,
+    "BreadCrumbs": 13,
 }
 _TEXT_PADDING = 24  # marge pour icônes/bordures
 
