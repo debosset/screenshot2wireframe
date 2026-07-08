@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from groq import Groq
 
-from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED
+from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED, get_measured
 
 # Liste complète et toujours à jour des typeID valides (source unique :
 # balsamiq_components.py). On ne restreint plus l'IA à un sous-ensemble —
@@ -18,10 +18,48 @@ from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED
 # corrige les rares hallucinations, elle ne limite pas ce que l'IA peut choisir.
 _TYPE_ID_LIST = ", ".join(sorted(VALID_TYPE_IDS))
 
-SYSTEM_PROMPT = f"""Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne UNIQUEMENT un JSON valide.
+# ── Schema JSON strict pour le mode "structured outputs" de Groq ──────────
+# Contrairement au simple "json_object" (best-effort + validation a
+# posteriori, qui peut encore échouer -- voir historique des bugs), ce mode
+# contraint le modèle TOKEN PAR TOKEN à ne produire que du JSON conforme.
+# Contraintes du mode strict: tous les champs listés sont obligatoires et
+# additionalProperties doit être false, donc le format est volontairement
+# PLAT et minimal : pas de "properties" imbriquées, pas de measuredW/H (on
+# les déduit nous-mêmes du typeID via balsamiq_components.MEASURED -- le
+# modèle n'a pas à connaître les dimensions par défaut de chaque composant
+# Balsamiq, c'était une source d'erreurs inutile), pas de zOrder (dérivé
+# mécaniquement de la position dans le tableau).
+JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "controls": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "typeID": {"type": "string"},
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"},
+                    "w": {"type": "integer"},
+                    "h": {"type": "integer"},
+                    "text": {"type": "string"},
+                    "selected": {"type": "boolean"},
+                },
+                "required": ["id", "typeID", "x", "y", "w", "h", "text", "selected"],
+                "additionalProperties": False,
+            },
+        },
+        "mockupW": {"type": "integer"},
+        "mockupH": {"type": "integer"},
+    },
+    "required": ["controls", "mockupW", "mockupH"],
+    "additionalProperties": False,
+}
 
-RÈGLES STRICTES :
-- Réponds UNIQUEMENT avec du JSON brut, sans markdown, sans explication, sans ```
+SYSTEM_PROMPT = f"""Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne un JSON conforme au schema fourni.
+
+RÈGLES :
 - Détecte TOUS les éléments visibles de haut en bas, y compris les éléments moins courants (Accordion, Tree, Menu, MenuBar, DataGrid, ProgressBar, Tooltip, TagCloud, Calendar, graphiques, etc.) quand ils sont présents à l'écran — ne te limite pas aux formulaires basiques.
 - Choisis le typeID le plus PRÉCIS possible parmi la liste ci-dessous plutôt qu'un générique (ex : un menu déroulant est un "ComboBox" pas un "Rectangle", une barre de progression est un "ProgressBar" pas un "HRule").
 - Voici TOUS les typeIDs valides dans Balsamiq (utilise exclusivement ceux-ci, respecte la casse exacte) :
@@ -42,34 +80,19 @@ RÈGLES STRICTES :
   - icône seule -> "Icon" ; icône + texte -> "IconLabel"
   - groupe de champs encadré -> "FieldSet"
   - bloc de texte long (paragraphe) -> "Paragraph" (pas "Label", réservé aux textes courts)
-- Les coordonnées x/y/w/h sont en base 1000px de large (hauteur proportionnelle)
-- ID commence à 0, zOrder identique à ID
-- Tous les champs sont des strings
-- IMPORTANT: si un texte contient des guillemets (ex: « Romande Énergie SA »), échappe tout guillemet droit interne avec \" -- ne laisse JAMAIS un caractère " non échappé à l'intérieur d'une valeur "text". Préfère garder les guillemets français « » tels quels, ils ne posent pas de problème contrairement aux guillemets droits "
-
-FORMAT EXACT :
-{{
-  "controls": [
-    {{"ID":"0","typeID":"Title","zOrder":"0","measuredW":"300","measuredH":"30","x":"50","y":"20","properties":{{"text":"Mon titre"}}}},
-    {{"ID":"1","typeID":"Label","zOrder":"1","measuredW":"100","measuredH":"17","x":"50","y":"60","properties":{{"text":"Nom"}}}},
-    {{"ID":"2","typeID":"TextInput","zOrder":"2","measuredW":"79","measuredH":"27","x":"50","y":"78","w":"400","properties":{{"text":""}}}},
-    {{"ID":"3","typeID":"CheckBox","zOrder":"3","measuredW":"100","measuredH":"23","x":"50","y":"120","properties":{{"text":"Option","selected":true}}}}
-  ],
-  "mockupW": "1000",
-  "mockupH": "800"
-}}
+- Les coordonnées x/y/w/h sont des ENTIERS en base 1000px de large (hauteur proportionnelle). w et h : mets 0 si non pertinent pour ce typeID (taille par défaut Balsamiq), sinon une largeur/hauteur explicite (utile surtout pour TextInput/TextArea/Rectangle/Image).
+- "id" est un entier séquentiel commençant à 0.
+- "text" est le texte affiché par le contrôle (chaîne vide "" si aucun texte, ex: HRule, Image).
+- "selected" est un booléen, pertinent uniquement pour CheckBox/RadioButton (true si coché/sélectionné) ; mets false pour tous les autres types.
 
 IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
 - Respecte la hiérarchie visuelle : titres > sous-titres > labels > champs
 - Pour les RadioButton côte à côte : même y, x différents
-- TextInput a toujours un w (largeur) car il est redimensionné, EN PLUS de measuredW/measuredH qui restent obligatoires sur CHAQUE contrôle sans exception
-- Button, Label, CheckBox, RadioButton n'ont pas besoin de w/h (taille par défaut), mais measuredW et measuredH restent obligatoires pour eux aussi
-- Ne JAMAIS écrire une clé sans sa valeur (ex: "measuredW","measuredH":"20" est INVALIDE) : chaque clé doit toujours être suivie de ":" puis de sa valeur avant la virgule suivante
 
 NE JAMAIS FUSIONNER PLUSIEURS ÉLÉMENTS DISTINCTS EN UN SEUL CONTRÔLE :
 - INTERDIT d'inventer un séparateur ("|", "I", "/", "-", etc.) pour coller plusieurs textes qui sont visuellement distincts dans l'image en une seule valeur "text". Chaque texte qui a sa propre couleur, taille, poids de police, ou position clairement séparée est un contrôle séparé, avec son propre x/y.
-- Exemple concret À NE PAS FAIRE : {{"text":"Romande Energie SA I Déposer un relevé énergétique annuel"}} -- ce sont DEUX éléments (un petit lien coloré + un gros titre en dessous), donc DEUX contrôles distincts : un Link ET un Title/SubTitle, à des y différents.
+- Exemple concret À NE PAS FAIRE : un texte "Romande Energie SA I Déposer un relevé énergétique annuel" -- ce sont DEUX éléments (un petit lien coloré + un gros titre en dessous), donc DEUX contrôles distincts : un Link ET un Title/SubTitle, à des y différents.
 - Indicateur d'étapes numérotées (cercles "1 2 3" avec des labels comme "Saisie / Vérification / Transmission" en dessous, reliés par une ligne) : ne JAMAIS le rendre comme une seule ligne de texte avec des séparateurs. Décompose-le en plusieurs contrôles Label distincts (un par étape), au même y, avec des x différents et bien espacés selon leur position réelle dans l'image."""
 
 
@@ -156,29 +179,33 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
                 "content": [
                     {"type": "text", "text": SYSTEM_PROMPT},
                     {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": "Analyse ce screenshot et retourne le JSON Balsamiq."}
+                    {"type": "text", "text": "Analyse ce screenshot et retourne le JSON conforme au schema."}
                 ]
             }
         ],
         temperature=0.1,
         max_tokens=4096,
-        # Mode JSON structuré : garantit une syntaxe JSON valide au niveau
-        # du décodage du modèle (contrainte token par token), plutôt que de
-        # compter uniquement sur le prompt + des réparations a posteriori.
-        # Supporté nativement par meta-llama/llama-4-scout-17b-16e-instruct.
-        response_format={"type": "json_object"},
+        # Vrai mode "structured outputs" : contraint le modèle TOKEN PAR
+        # TOKEN à ne produire que du JSON conforme au schema (contrairement
+        # à {"type":"json_object"} qui n'est qu'un best-effort validé après
+        # coup, et qui échouait encore avec des clés cassées). Supporté
+        # nativement par meta-llama/llama-4-scout-17b-16e-instruct.
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "balsamiq_mockup", "strict": True, "schema": JSON_SCHEMA},
+        },
     )
 
     raw = response.choices[0].message.content.strip()
-    # Nettoyer si markdown
-    raw = re.sub(r'^```json\s*', '', raw)
-    raw = re.sub(r'^```\s*', '', raw)
-    raw = re.sub(r'\s*```$', '', raw)
 
-    parsed = None
+    # Le mode structured outputs garantit une syntaxe JSON valide -- ce
+    # json.loads() ne devrait plus jamais échouer. On garde quand même les
+    # réparations en filet de sécurité au cas où (ex: si Groq change de
+    # comportement, ou pour un autre modèle moins strict à l'avenir).
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
+        parsed = None
         for repair_fn in (_repair_dangling_keys, _repair_unescaped_quotes,
                           lambda s: _repair_unescaped_quotes(_repair_dangling_keys(s))):
             try:
@@ -187,9 +214,6 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
             except json.JSONDecodeError:
                 continue
         if parsed is None:
-            # Aucune réparation n'a suffi -- on remonte un extrait du JSON
-            # brut autour de l'erreur pour diagnostiquer précisément la
-            # vraie cause plutôt que de deviner à l'aveugle.
             try:
                 json.loads(raw)
             except json.JSONDecodeError as e2:
@@ -198,9 +222,37 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
                 snippet = raw[start:end]
                 raise ValueError(f"{e2} | extrait autour de l'erreur: ...{snippet!r}...") from e2
 
-    controls = parsed.get("controls", [])
-    mockup_w = parsed.get("mockupW", "1000")
-    mockup_h = parsed.get("mockupH", "800")
+    flat_controls = parsed.get("controls", [])
+    mockup_w = str(parsed.get("mockupW") or 1000)
+    mockup_h = str(parsed.get("mockupH") or 800)
+
+    # Reconstruire le format Balsamiq complet (nested "properties", ID/zOrder
+    # en string, measuredW/measuredH) depuis le format plat renvoyé par Groq.
+    # measuredW/measuredH ne sont PLUS demandés au modèle : on les déduit
+    # nous-mêmes du typeID via balsamiq_components.MEASURED, une source
+    # fiable plutôt qu'un nombre halluciné par le LLM.
+    controls = []
+    for idx, fc in enumerate(flat_controls):
+        tid = fc.get("typeID", "Rectangle")
+        mw, mh = get_measured(tid)
+        control = {
+            "ID": str(fc.get("id", idx)),
+            "typeID": tid,
+            "zOrder": str(idx),
+            "measuredW": str(mw),
+            "measuredH": str(mh),
+            "x": str(fc.get("x", 0)),
+            "y": str(fc.get("y", 0)),
+            "properties": {"text": fc.get("text", "")},
+        }
+        w, h = fc.get("w", 0), fc.get("h", 0)
+        if w:
+            control["w"] = str(w)
+        if h:
+            control["h"] = str(h)
+        if tid in ("CheckBox", "RadioButton"):
+            control["properties"]["selected"] = bool(fc.get("selected", False))
+        controls.append(control)
 
     import uuid
     return {
