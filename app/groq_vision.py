@@ -85,7 +85,7 @@ RÈGLES :
 - "id" est un entier séquentiel commençant à 0.
 - "text" est le texte affiché par le contrôle (chaîne vide "" si aucun texte, ex: HRule, Image).
 - "selected" est un booléen, pertinent uniquement pour CheckBox/RadioButton (true si coché/sélectionné) ; mets false pour tous les autres types.
-- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un contrôle "Rectangle" que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image (ex: bandeau vert en haut de page, bloc gris derrière un titre). Laisse "" (vide) pour tous les autres contrôles, et n'ajoute PAS de Rectangle coloré si tu n'es pas sûr de la couleur exacte. Positionne ce Rectangle en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
+- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un bloc que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image (ex: bandeau vert en haut de page, bloc gris derrière un titre). Mets typeID "Rectangle" pour ce bloc (peu importe, il sera converti automatiquement). Laisse fillColor "" (vide) pour tous les autres contrôles, et n'ajoute PAS de bloc coloré si tu n'es pas sûr de la couleur exacte. Positionne ce bloc en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
 
 NE JAMAIS INVENTER D'ÉLÉMENTS QUI NE SONT PAS DANS L'IMAGE :
 - INTERDIT d'ajouter un menu, une barre de navigation, des liens ou tout élément que tu ne vois PAS explicitement dans le screenshot. Si tu hésites entre "il y a peut-être un menu ici" et "je ne suis pas sûr", NE L'AJOUTE PAS.
@@ -248,6 +248,17 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     for idx, fc in enumerate(flat_controls):
         tid = fc.get("typeID", "Rectangle")
         text = fc.get("text", "")
+
+        # Un bloc de couleur de fond doit être un "Canvas" (pas "Rectangle" --
+        # confirmé buggy en pratique) avec "color" ET "borderColor" identiques
+        # pour avoir un aplat plein plutôt qu'un simple contour. On force le
+        # typeID indépendamment de ce que le modèle a choisi, dès qu'une
+        # fillColor valide est fournie.
+        hexcolor = (fc.get("fillColor") or "").strip().lstrip("#")
+        is_color_block = len(hexcolor) == 6
+        if is_color_block:
+            tid = "Canvas"
+
         mw, mh = estimate_measured(tid, text)
         properties = {"text": text}
         if tid == "Title":
@@ -271,13 +282,13 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
             control["h"] = str(h)
         if tid in ("CheckBox", "RadioButton"):
             control["properties"]["selected"] = bool(fc.get("selected", False))
-        if tid == "Rectangle":
-            hexcolor = (fc.get("fillColor") or "").strip().lstrip("#")
-            if len(hexcolor) == 6:
-                try:
-                    control["properties"]["color"] = str(int(hexcolor, 16))
-                except ValueError:
-                    pass
+        if is_color_block:
+            try:
+                decimal_color = str(int(hexcolor, 16))
+                control["properties"]["color"] = decimal_color
+                control["properties"]["borderColor"] = decimal_color
+            except ValueError:
+                pass
         controls.append(control)
 
     import uuid

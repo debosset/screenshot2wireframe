@@ -128,6 +128,7 @@ MEASURED: Dict[str, Tuple[int, int]] = {
     "ColumnChart":  (250, 180),
     "LineChart":    (250, 180),
     "PieChart":     (180, 180),
+    "Canvas":       (100, 70),
 }
 
 DEFAULT_MEASURED: Tuple[int, int] = (100, 20)
