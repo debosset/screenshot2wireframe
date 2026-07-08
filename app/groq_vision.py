@@ -61,58 +61,23 @@ JSON_SCHEMA = {
 SYSTEM_PROMPT = f"""Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d'interface web et retourne un JSON conforme au schema fourni.
 
 RÈGLES :
-- Détecte TOUS les éléments visibles de haut en bas, y compris les éléments moins courants (Accordion, Tree, Menu, MenuBar, DataGrid, ProgressBar, Tooltip, TagCloud, Calendar, graphiques, etc.) quand ils sont présents à l'écran — ne te limite pas aux formulaires basiques.
-- Choisis le typeID le plus PRÉCIS possible parmi la liste ci-dessous plutôt qu'un générique (ex : un menu déroulant est un "ComboBox" pas un "Rectangle", une barre de progression est un "ProgressBar" pas un "HRule").
-- Voici TOUS les typeIDs valides dans Balsamiq (utilise exclusivement ceux-ci, respecte la casse exacte) :
-  {_TYPE_ID_LIST}
-- Cas fréquents à bien mapper :
-  - barre de navigation horizontale (liens en haut de page) -> "LinkBar" (jamais "NavBar", ça n'existe pas)
-  - fil d'Ariane -> "BreadCrumbs" au pluriel (jamais "BreadCrumb")
-  - pagination -> pas de contrôle natif dédié, utilise "ButtonBar"
-  - tableau de données / liste de résultats -> "DataGrid"
-  - liste verticale d'éléments simples -> "List"
-  - arborescence (fichiers, catégories imbriquées) -> "Tree"
-  - menu déroulant / select -> "ComboBox"
-  - menu contextuel ou latéral -> "Menu" ou "MenuBar" selon l'orientation
-  - onglets -> "TabBar"
-  - accordéon / sections repliables -> "Accordion"
-  - champ de recherche -> "SearchBox"
-  - sélecteur de date -> "DateChooser"
-  - icône seule -> "Icon" ; icône + texte -> "IconLabel"
-  - groupe de champs encadré -> "FieldSet"
-  - bloc de texte long (paragraphe) -> "Paragraph" (pas "Label", réservé aux textes courts)
-- Les coordonnées x/y/w/h sont des ENTIERS en base 1000px de large (hauteur proportionnelle). w et h : mets 0 si non pertinent pour ce typeID (taille par défaut Balsamiq), sinon une largeur/hauteur explicite (utile surtout pour TextInput/TextArea/Rectangle/Image).
-- "id" est un entier séquentiel commençant à 0.
-- "text" est le texte affiché par le contrôle (chaîne vide "" si aucun texte, ex: HRule, Image).
-- "selected" est un booléen, pertinent uniquement pour CheckBox/RadioButton (true si coché/sélectionné) ; mets false pour tous les autres types.
-- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un bloc que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image. Mets typeID "Rectangle" pour ce bloc (peu importe, il sera converti automatiquement). Laisse fillColor "" (vide) pour tous les autres contrôles, et n'ajoute PAS de bloc coloré si tu n'es pas sûr de la couleur exacte. Positionne ce bloc en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
-- Cas fréquent : une bande décorative fine tout en haut de page (souvent un motif ou une couleur de marque) -- mesure sa hauteur RÉELLE dans l'image, elle est presque toujours fine (15-30px en base 1000), ne l'étends JAMAIS artificiellement pour couvrir tout le header. Le nom de l'app/organisme (ex: "État de Vaud") à gauche et les infos utilisateur (nom d'entreprise, prénom nom) à droite se trouvent EN DESSOUS de cette bande, pas dedans ni par-dessus.
-- Si un bloc gris clair (fond ~#eeeeee) entoure un lien de fil d'Ariane et un titre de page juste en dessous du header, crée un bloc coloré séparé pour ce bloc gris (Canvas, position/taille englobant les deux), distinct du bandeau de couleur du header tout en haut.
+- PRIORITÉ ABSOLUE : détecte TOUS les éléments visibles de haut en bas, sans exception. Une analyse incomplète (élément oublié) est pire qu'une analyse avec un détail imparfait. Avant de finir, repasse mentalement l'image de haut en bas et vérifie que chaque texte, titre, champ et bouton a bien un contrôle correspondant.
+- Choisis le typeID le plus PRÉCIS possible (ex : menu déroulant -> "ComboBox" pas "Rectangle" ; barre de progression -> "ProgressBar" pas "HRule").
+- TypeIDs valides (casse exacte, exclusivement ceux-ci) : {_TYPE_ID_LIST}
+- Mappings fréquents : nav horizontale -> "LinkBar" (jamais "NavBar") ; fil d'Ariane -> "BreadCrumbs" (jamais "BreadCrumb") ; pagination -> "ButtonBar" (pas de type dédié) ; tableau -> "DataGrid" ; liste -> "List" ; arborescence -> "Tree" ; select -> "ComboBox" ; onglets -> "TabBar" ; accordéon -> "Accordion" ; recherche -> "SearchBox" ; date -> "DateChooser" ; icône -> "Icon"/"IconLabel" ; paragraphe long -> "Paragraph" (pas "Label").
+- x/y/w/h sont des ENTIERS base 1000px large. w/h : 0 si taille par défaut suffit, sinon valeur explicite (surtout pour TextInput/TextArea/Rectangle/Image).
+- "id" entier séquentiel depuis 0. "text" = texte affiché ("" si aucun). "selected" booléen (CheckBox/RadioButton uniquement, false sinon).
+- "fillColor" (hex, ex "#4CAF50") UNIQUEMENT pour un bandeau/bloc de couleur unie clairement visible que tu ajoutes toi-même (typeID "Rectangle", peu importe, converti auto) ; "" pour tout le reste, jamais si tu doutes de la couleur exacte. Mesure sa hauteur RÉELLE (souvent une fine bande 15-30px, ne l'étends pas artificiellement). Place-le en PREMIER dans "controls".
 
-NE JAMAIS INVENTER D'ÉLÉMENTS QUI NE SONT PAS DANS L'IMAGE :
-- INTERDIT d'ajouter un menu, une barre de navigation, des liens ou tout élément que tu ne vois PAS explicitement dans le screenshot. Si tu hésites entre "il y a peut-être un menu ici" et "je ne suis pas sûr", NE L'AJOUTE PAS.
-- Erreur déjà observée à éviter : ajouter un faux menu "Home | Products | Company | Blog" qui n'existait pas du tout dans l'image source. Chaque contrôle doit correspondre à quelque chose de RÉELLEMENT visible.
-
-ÉVITER LES CHEVAUCHEMENTS :
-- Dans les zones denses (ex: coin en haut à droite avec un nom d'utilisateur sur 2 lignes, ou plusieurs liens groupés), assure-toi que les coordonnées x/y de chaque contrôle ne se chevauchent pas avec un autre. Deux textes empilés verticalement (ex: "Romande Énergie SA" au-dessus de "Adrien De Bosset") doivent avoir un y clairement différent (au moins measuredH + 3px d'écart), jamais le même y.
-
-TITRES DE SECTION :
-- Un titre de section (texte en gras, nettement plus grand que le texte de formulaire autour, généralement seul sur sa ligne, ex: "Identification de l'entité") est TOUJOURS un "SubTitle" ou un "Title", JAMAIS un "Label" -- même si son y est proche d'autres labels de formulaire. Le Label est réservé aux petits textes de formulaire (ex: "Nom", "Raison sociale").
-
-"Link" vs "Title"/"SubTitle" :
-- "Link" UNIQUEMENT si le texte est visuellement coloré et/ou souligné, signe qu'il est cliquable (ex: fil d'Ariane "Romande Énergie SA").
-- Un texte en noir plein, même à côté ou juste en dessous d'un lien, n'est PAS un lien : c'est un "Title" ou "SubTitle" selon sa taille. Erreur déjà observée à éviter : "Déposer un relevé énergétique annuel" pris à tort pour un Link alors que c'est un titre de page en noir, pas cliquable.
-
-IMPORTANT pour le placement :
-- Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
-- Respecte la hiérarchie visuelle : titres > sous-titres > labels > champs
-- Pour les RadioButton côte à côte : même y, x différents
-- Laisse un espacement vertical d'au moins 20-25px entre le bloc d'en-tête (logo, titre principal de l'app) et les éléments qui suivent (breadcrumb, lien de retour...) -- ne les colle jamais l'un contre l'autre même s'ils sont proches dans l'image source
-
-NE JAMAIS FUSIONNER PLUSIEURS ÉLÉMENTS DISTINCTS EN UN SEUL CONTRÔLE :
-- INTERDIT d'inventer un séparateur ("|", "I", "/", "-", etc.) pour coller plusieurs textes qui sont visuellement distincts dans l'image en une seule valeur "text". Chaque texte qui a sa propre couleur, taille, poids de police, ou position clairement séparée est un contrôle séparé, avec son propre x/y.
-- Exemple concret À NE PAS FAIRE : un texte "Romande Energie SA I Déposer un relevé énergétique annuel" -- ce sont DEUX éléments (un petit lien coloré + un gros titre en dessous), donc DEUX contrôles distincts : un Link ET un Title/SubTitle, à des y différents.
-- Indicateur d'étapes numérotées (cercles "1 2 3" avec des labels comme "Saisie / Vérification / Transmission" en dessous, reliés par une ligne) : ne JAMAIS le rendre comme une seule ligne de texte avec des séparateurs, et ne JAMAIS utiliser "ProgressBar", "Rectangle" ou tout autre type qui donnerait une barre/rectangle plein pour représenter les cercles ou la ligne de connexion (ça rend très mal). Pour chaque cercle numéroté, utilise "RoundButton" (mesure environ 32x32, le numéro comme texte). Pour le texte sous chaque cercle ("Saisie", "Vérification"...), un "Label" séparé juste en dessous, centré sous son cercle. N'ajoute PAS de ligne de connexion entre les cercles si tu n'es pas certain qu'un typeID Balsamiq la représente bien -- mieux vaut l'omettre que de la rendre comme un rectangle disgracieux."""
+CAS PARTICULIERS À BIEN GÉRER :
+- N'invente RIEN qui n'est pas visible (pas de faux menu/lien/bouton). Dans le doute, n'ajoute pas.
+- Deux textes empilés proches (ex: nom d'entreprise au-dessus d'un prénom) : y clairement différents, jamais identiques.
+- Titre de section (gras, plus grand que le texte de formulaire, seul sur sa ligne) -> "SubTitle"/"Title", JAMAIS "Label".
+- "Link" seulement si le texte est visuellement coloré/souligné (cliquable). Un texte noir plein à côté d'un lien N'EST PAS un lien -- reste "Title"/"SubTitle".
+- Jamais fusionner 2 textes visuellement distincts (couleur/taille/police différente) en une seule valeur "text" avec un séparateur inventé ("|", "I"...) : ce sont 2 contrôles séparés.
+- Cercles numérotés d'étapes (ex "1 2 3" + "Saisie/Vérification/Transmission") : "RoundButton" (~32x32) pour chaque cercle + "Label" pour le texte dessous. JAMAIS "ProgressBar"/"Rectangle" pour ça (rendu disgracieux). Omets la ligne de connexion plutôt que de mal la représenter.
+- Label juste AU-DESSUS de son TextInput (y_label + 15 ≈ y_input). Hiérarchie : titres > sous-titres > labels > champs. RadioButton côte à côte : même y, x différents.
+- Chaque TextInput/TextArea doit avoir un "h" explicite d'au moins 30px et un espacement vertical d'au moins 15-20px avant le label du champ suivant -- ne laisse jamais deux champs se toucher ou se chevaucher visuellement."""
 
 
 def _repair_dangling_keys(raw: str) -> str:
