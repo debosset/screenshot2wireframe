@@ -155,32 +155,48 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
 
     client = Groq(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": SYSTEM_PROMPT},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": "Analyse ce screenshot et retourne le JSON conforme au schema."}
-                ]
-            }
-        ],
-        temperature=0.1,
-        max_tokens=4096,
-        # Vrai mode "structured outputs" : contraint le modèle TOKEN PAR
-        # TOKEN à ne produire que du JSON conforme au schema (contrairement
-        # à {"type":"json_object"} qui n'est qu'un best-effort validé après
-        # coup, et qui échouait encore avec des clés cassées). Supporté
-        # nativement par meta-llama/llama-4-scout-17b-16e-instruct.
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "balsamiq_mockup", "strict": True, "schema": JSON_SCHEMA},
-        },
-    )
+    from groq import BadRequestError
 
-    raw = response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": SYSTEM_PROMPT},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        {"type": "text", "text": "Analyse ce screenshot et retourne le JSON conforme au schema."}
+                    ]
+                }
+            ],
+            temperature=0.1,
+            max_tokens=4096,
+            # Vrai mode "structured outputs" : contraint le modèle TOKEN PAR
+            # TOKEN à ne produire que du JSON conforme au schema (contrairement
+            # à {"type":"json_object"} qui n'est qu'un best-effort validé après
+            # coup, et qui échouait encore avec des clés cassées). Supporté
+            # nativement par meta-llama/llama-4-scout-17b-16e-instruct.
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "balsamiq_mockup", "strict": True, "schema": JSON_SCHEMA},
+            },
+        )
+        raw = response.choices[0].message.content.strip()
+    except BadRequestError as e:
+        # Même en mode "strict", Groq peut rejeter SA PROPRE génération si
+        # elle ne colle pas exactement au schema (déjà vu : un contrôle sur
+        # 26 sans "fillColor"). Plutôt que de perdre tout le travail, on
+        # récupère le JSON généré dans l'erreur elle-même (failed_generation)
+        # -- il est presque toujours utilisable tel quel, nos champs
+        # manquants sont déjà tous gérés avec des valeurs par défaut (.get()
+        # avec fallback) dans la reconstruction plus bas.
+        body = getattr(e, "body", None) or {}
+        error_info = body.get("error", {}) if isinstance(body, dict) else {}
+        failed_gen = error_info.get("failed_generation") if isinstance(error_info, dict) else None
+        if not failed_gen:
+            raise
+        raw = failed_gen.strip()
 
     # Le mode structured outputs garantit une syntaxe JSON valide -- ce
     # json.loads() ne devrait plus jamais échouer. On garde quand même les
