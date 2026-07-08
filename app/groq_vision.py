@@ -106,7 +106,7 @@ IMPORTANT pour le placement :
 NE JAMAIS FUSIONNER PLUSIEURS ÉLÉMENTS DISTINCTS EN UN SEUL CONTRÔLE :
 - INTERDIT d'inventer un séparateur ("|", "I", "/", "-", etc.) pour coller plusieurs textes qui sont visuellement distincts dans l'image en une seule valeur "text". Chaque texte qui a sa propre couleur, taille, poids de police, ou position clairement séparée est un contrôle séparé, avec son propre x/y.
 - Exemple concret À NE PAS FAIRE : un texte "Romande Energie SA I Déposer un relevé énergétique annuel" -- ce sont DEUX éléments (un petit lien coloré + un gros titre en dessous), donc DEUX contrôles distincts : un Link ET un Title/SubTitle, à des y différents.
-- Indicateur d'étapes numérotées (cercles "1 2 3" avec des labels comme "Saisie / Vérification / Transmission" en dessous, reliés par une ligne) : ne JAMAIS le rendre comme une seule ligne de texte avec des séparateurs. Décompose-le en plusieurs contrôles Label distincts (un par étape), au même y, avec des x différents et bien espacés selon leur position réelle dans l'image."""
+- Indicateur d'étapes numérotées (cercles "1 2 3" avec des labels comme "Saisie / Vérification / Transmission" en dessous, reliés par une ligne) : ne JAMAIS le rendre comme une seule ligne de texte avec des séparateurs, et ne JAMAIS utiliser "ProgressBar", "Rectangle" ou tout autre type qui donnerait une barre/rectangle plein pour représenter les cercles ou la ligne de connexion (ça rend très mal). Pour chaque cercle numéroté, utilise "RoundButton" (mesure environ 32x32, le numéro comme texte). Pour le texte sous chaque cercle ("Saisie", "Vérification"...), un "Label" séparé juste en dessous, centré sous son cercle. N'ajoute PAS de ligne de connexion entre les cercles si tu n'es pas certain qu'un typeID Balsamiq la représente bien -- mieux vaut l'omettre que de la rendre comme un rectangle disgracieux."""
 
 
 def _repair_dangling_keys(raw: str) -> str:
@@ -289,7 +289,16 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
                 control["properties"]["borderColor"] = decimal_color
             except ValueError:
                 pass
-        controls.append(control)
+        controls.append((is_color_block, control))
+
+    # Forcer les blocs de couleur (Canvas) en arrière-plan (zOrder le plus
+    # bas), indépendamment de l'ordre choisi par le modèle -- on ne compte
+    # plus sur sa discipline à les mettre en premier dans le tableau, ce qui
+    # a déjà causé un Canvas passant devant un titre et le masquant.
+    controls.sort(key=lambda item: (not item[0],))
+    controls = [c for _, c in controls]
+    for new_idx, c in enumerate(controls):
+        c["zOrder"] = str(new_idx)
 
     import uuid
     return {
