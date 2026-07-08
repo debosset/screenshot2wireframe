@@ -85,7 +85,9 @@ RÈGLES :
 - "id" est un entier séquentiel commençant à 0.
 - "text" est le texte affiché par le contrôle (chaîne vide "" si aucun texte, ex: HRule, Image).
 - "selected" est un booléen, pertinent uniquement pour CheckBox/RadioButton (true si coché/sélectionné) ; mets false pour tous les autres types.
-- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un bloc que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image (ex: bandeau vert en haut de page, bloc gris derrière un titre). Mets typeID "Rectangle" pour ce bloc (peu importe, il sera converti automatiquement). Laisse fillColor "" (vide) pour tous les autres contrôles, et n'ajoute PAS de bloc coloré si tu n'es pas sûr de la couleur exacte. Positionne ce bloc en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
+- "fillColor" : couleur de fond en hex (ex: "#4CAF50") UNIQUEMENT pour un bloc que tu ajoutes explicitement pour représenter un bandeau/bloc de couleur unie clairement visible dans l'image. Mets typeID "Rectangle" pour ce bloc (peu importe, il sera converti automatiquement). Laisse fillColor "" (vide) pour tous les autres contrôles, et n'ajoute PAS de bloc coloré si tu n'es pas sûr de la couleur exacte. Positionne ce bloc en PREMIER dans le tableau "controls" (zOrder le plus bas) pour qu'il reste en arrière-plan, derrière le texte qui doit rester lisible par-dessus.
+- Cas fréquent : une bande décorative fine tout en haut de page (souvent un motif ou une couleur de marque) -- mesure sa hauteur RÉELLE dans l'image, elle est presque toujours fine (15-30px en base 1000), ne l'étends JAMAIS artificiellement pour couvrir tout le header. Le nom de l'app/organisme (ex: "État de Vaud") à gauche et les infos utilisateur (nom d'entreprise, prénom nom) à droite se trouvent EN DESSOUS de cette bande, pas dedans ni par-dessus.
+- Si un bloc gris clair (fond ~#eeeeee) entoure un lien de fil d'Ariane et un titre de page juste en dessous du header, crée un bloc coloré séparé pour ce bloc gris (Canvas, position/taille englobant les deux), distinct du bandeau de couleur du header tout en haut.
 
 NE JAMAIS INVENTER D'ÉLÉMENTS QUI NE SONT PAS DANS L'IMAGE :
 - INTERDIT d'ajouter un menu, une barre de navigation, des liens ou tout élément que tu ne vois PAS explicitement dans le screenshot. Si tu hésites entre "il y a peut-être un menu ici" et "je ne suis pas sûr", NE L'AJOUTE PAS.
@@ -96,6 +98,10 @@ NE JAMAIS INVENTER D'ÉLÉMENTS QUI NE SONT PAS DANS L'IMAGE :
 
 TITRES DE SECTION :
 - Un titre de section (texte en gras, nettement plus grand que le texte de formulaire autour, généralement seul sur sa ligne, ex: "Identification de l'entité") est TOUJOURS un "SubTitle" ou un "Title", JAMAIS un "Label" -- même si son y est proche d'autres labels de formulaire. Le Label est réservé aux petits textes de formulaire (ex: "Nom", "Raison sociale").
+
+"Link" vs "Title"/"SubTitle" :
+- "Link" UNIQUEMENT si le texte est visuellement coloré et/ou souligné, signe qu'il est cliquable (ex: fil d'Ariane "Romande Énergie SA").
+- Un texte en noir plein, même à côté ou juste en dessous d'un lien, n'est PAS un lien : c'est un "Title" ou "SubTitle" selon sa taille. Erreur déjà observée à éviter : "Déposer un relevé énergétique annuel" pris à tort pour un Link alors que c'est un titre de page en noir, pas cliquable.
 
 IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
@@ -260,11 +266,14 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
             tid = "Canvas"
 
         mw, mh = estimate_measured(tid, text)
-        properties = {"text": text}
         if tid == "Title":
+            properties = {"text": f"*{text}*" if text else text}
             properties["size"] = "20"
         elif tid == "SubTitle":
+            properties = {"text": f"*{text}*" if text else text}
             properties["size"] = "16"
+        else:
+            properties = {"text": text}
         control = {
             "ID": str(fc.get("id", idx)),
             "typeID": tid,
