@@ -146,6 +146,49 @@ def _repair_unescaped_quotes(raw: str) -> str:
     return ''.join(out)
 
 
+_TEXT_TYPES = {"Title", "SubTitle", "Label", "Link", "IconLabel", "Tooltip"}
+
+
+def _dim(control, key, measured_key):
+    """Récupère w/h en tenant compte du fait que '0' est une string
+    'truthy' en Python -- un simple `a.get('w') or a['measuredW']` ne
+    retombe jamais sur measuredW quand w vaut la string '0'."""
+    val = control.get(key)
+    if val in (None, "", "0"):
+        return int(control[measured_key])
+    return int(val)
+
+
+def _fix_text_overlaps(controls):
+    """
+    Filet de sécurité programmatique contre les chevauchements de texte que
+    le prompt seul n'arrive pas à éliminer de façon fiable (ex: "ÉTAT DE
+    VAUD" chevauchant un lien juste à côté, malgré plusieurs tentatives de
+    consignes -- un modèle probabiliste ne garantit jamais 100% de
+    conformité à une règle de prompt). Ne touche qu'aux contrôles texte
+    (Title/SubTitle/Label/Link...), pas aux champs de formulaire ni aux
+    blocs de couleur, pour rester conservateur.
+    Décale le contrôle le plus TARDIF (déjà trié par zOrder, donc plus
+    tardif = par-dessus) vers le bas quand deux contrôles texte se
+    chevauchent significativement.
+    """
+    text_controls = [c for c in controls if c["typeID"] in _TEXT_TYPES]
+    for i, a in enumerate(text_controls):
+        ax, ay = int(a["x"]), int(a["y"])
+        aw, ah = _dim(a, "w", "measuredW"), _dim(a, "h", "measuredH")
+        for b in text_controls[i + 1:]:
+            bx, by = int(b["x"]), int(b["y"])
+            bw, bh = _dim(b, "w", "measuredW"), _dim(b, "h", "measuredH")
+            ix = min(ax + aw, bx + bw) - max(ax, bx)
+            iy = min(ay + ah, by + bh) - max(ay, by)
+            if ix > 0 and iy > 0 and (ix * iy) > 0.3 * min(aw * ah, bw * bh):
+                # Chevauchement significatif : pousse b sous a
+                new_y = ay + ah + 4
+                if new_y != by:
+                    b["y"] = str(new_y)
+                    by = new_y
+
+
 def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") -> Dict[str, Any]:
     """Analyse l'image et retourne le JSON Balsamiq complet."""
     # Encoder l'image
@@ -290,6 +333,8 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     controls = [c for _, c in controls]
     for new_idx, c in enumerate(controls):
         c["zOrder"] = str(new_idx)
+
+    _fix_text_overlaps(controls)
 
     import uuid
     return {
