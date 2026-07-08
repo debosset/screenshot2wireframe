@@ -162,6 +162,11 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
         ],
         temperature=0.1,
         max_tokens=4096,
+        # Mode JSON structuré : garantit une syntaxe JSON valide au niveau
+        # du décodage du modèle (contrainte token par token), plutôt que de
+        # compter uniquement sur le prompt + des réparations a posteriori.
+        # Supporté nativement par meta-llama/llama-4-scout-17b-16e-instruct.
+        response_format={"type": "json_object"},
     )
 
     raw = response.choices[0].message.content.strip()
