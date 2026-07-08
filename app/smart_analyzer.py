@@ -8,7 +8,7 @@ import pytesseract
 import re
 from typing import List, Dict, Any
 
-from .balsamiq_components import MEASURED, DEFAULT_MEASURED
+from .balsamiq_components import MEASURED, DEFAULT_MEASURED, estimate_measured
 
 GAP = 18        # espace entre label et champ
 FIELD_H = 28    # hauteur standard d'un TextInput
@@ -186,7 +186,8 @@ def _is_hint(line):
 
 
 def _make_ctrl(id_, tid, x, y, w=None, h=None, props=None):
-    mw, mh = MEASURED.get(tid, (w or 100, h or 20))
+    text = props.get("text", "") if props else ""
+    mw, mh = estimate_measured(tid, text) if not (w or h) else MEASURED.get(tid, (w or 100, h or 20))
     c = {
         "ID": str(id_),
         "typeID": tid,

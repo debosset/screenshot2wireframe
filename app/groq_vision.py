@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from groq import Groq
 
-from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED, get_measured
+from .balsamiq_components import VALID_TYPE_IDS, MEASURED as COMPONENT_MEASURED, get_measured, estimate_measured
 
 # Liste complète et toujours à jour des typeID valides (source unique :
 # balsamiq_components.py). On ne restreint plus l'IA à un sous-ensemble —
@@ -89,6 +89,7 @@ IMPORTANT pour le placement :
 - Label juste AU-DESSUS du TextInput correspondant (y_label + 15 = y_input environ)
 - Respecte la hiérarchie visuelle : titres > sous-titres > labels > champs
 - Pour les RadioButton côte à côte : même y, x différents
+- Laisse un espacement vertical d'au moins 20-25px entre le bloc d'en-tête (logo, titre principal de l'app) et les éléments qui suivent (breadcrumb, lien de retour...) -- ne les colle jamais l'un contre l'autre même s'ils sont proches dans l'image source
 
 NE JAMAIS FUSIONNER PLUSIEURS ÉLÉMENTS DISTINCTS EN UN SEUL CONTRÔLE :
 - INTERDIT d'inventer un séparateur ("|", "I", "/", "-", etc.) pour coller plusieurs textes qui sont visuellement distincts dans l'image en une seule valeur "text". Chaque texte qui a sa propre couleur, taille, poids de police, ou position clairement séparée est un contrôle séparé, avec son propre x/y.
@@ -234,7 +235,13 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
     controls = []
     for idx, fc in enumerate(flat_controls):
         tid = fc.get("typeID", "Rectangle")
-        mw, mh = get_measured(tid)
+        text = fc.get("text", "")
+        mw, mh = estimate_measured(tid, text)
+        properties = {"text": text}
+        if tid == "Title":
+            properties["size"] = "20"
+        elif tid == "SubTitle":
+            properties["size"] = "16"
         control = {
             "ID": str(fc.get("id", idx)),
             "typeID": tid,
@@ -243,7 +250,7 @@ def analyze_with_groq(image_path: str, api_key: str, project_id: str = "0:1") ->
             "measuredH": str(mh),
             "x": str(fc.get("x", 0)),
             "y": str(fc.get("y", 0)),
-            "properties": {"text": fc.get("text", "")},
+            "properties": properties,
         }
         w, h = fc.get("w", 0), fc.get("h", 0)
         if w:

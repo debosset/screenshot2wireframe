@@ -132,6 +132,44 @@ MEASURED: Dict[str, Tuple[int, int]] = {
 
 DEFAULT_MEASURED: Tuple[int, int] = (100, 20)
 
+# Largeur moyenne approximative d'un caractère (en px, base 1000) pour les
+# typeID dont le texte est affiché directement dans le contrôle et dont la
+# taille de police par défaut Balsamiq est notablement plus grande que la
+# police standard (Title, SubTitle...). Sans ça, une largeur fixe (ex: 300px
+# pour un Title) coupe le texte dès qu'il dépasse ~15-20 caractères, ce qui
+# arrive tout le temps sur de vrais titres ("ÉTAT DE VAUD", "Identification
+# de l'entité"...).
+_CHAR_WIDTH = {
+    "Title": 26,
+    "SubTitle": 14,
+    "Label": 7,
+    "Link": 7,
+    "IconLabel": 7,
+    "Tooltip": 7,
+    "Button": 8,
+    "MultilineButton": 8,
+    "ButtonBar": 8,
+    "SearchBox": 7,
+    "ComboBox": 7,
+    "BreadCrumbs": 7,
+}
+_TEXT_PADDING = 24  # marge pour icônes/bordures
+
+
+def estimate_measured(tid: str, text: str) -> Tuple[int, int]:
+    """
+    Comme get_measured(), mais élargit measuredW en fonction de la longueur
+    réelle du texte pour les types où le texte est affiché tel quel dans le
+    contrôle (Title, SubTitle, Label...). Ne réduit jamais en dessous du
+    minimum par défaut, seulement agrandit si le texte est long.
+    """
+    mw, mh = get_measured(tid)
+    char_w = _CHAR_WIDTH.get(tid)
+    if char_w and text:
+        estimated = int(len(text) * char_w) + _TEXT_PADDING
+        mw = max(mw, estimated)
+    return mw, mh
+
 
 def normalize_type_id(tid: str) -> str:
     """
