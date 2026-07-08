@@ -62,6 +62,7 @@ SYSTEM_PROMPT = f"""Tu es un expert Balsamiq Wireframes. Analyse ce screenshot d
 
 RÈGLES :
 - PRIORITÉ ABSOLUE : détecte TOUS les éléments visibles de haut en bas, sans exception. Une analyse incomplète (élément oublié) est pire qu'une analyse avec un détail imparfait. Avant de finir, repasse mentalement l'image de haut en bas et vérifie que chaque texte, titre, champ et bouton a bien un contrôle correspondant.
+- Piège fréquent à ne PAS reproduire : le nom de l'organisme/app en haut à gauche en gros caractères (ex: "ÉTAT DE VAUD") est un "Title" à PART ENTIÈRE, même s'il est juste en dessous ou à côté d'une bande colorée décorative -- ce n'est pas la même chose que le bandeau, ne l'omets jamais.
 - Choisis le typeID le plus PRÉCIS possible (ex : menu déroulant -> "ComboBox" pas "Rectangle" ; barre de progression -> "ProgressBar" pas "HRule").
 - TypeIDs valides (casse exacte, exclusivement ceux-ci) : {_TYPE_ID_LIST}
 - Mappings fréquents : nav horizontale -> "LinkBar" (jamais "NavBar") ; fil d'Ariane -> "BreadCrumbs" (jamais "BreadCrumb") ; pagination -> "ButtonBar" (pas de type dédié) ; tableau -> "DataGrid" ; liste -> "List" ; arborescence -> "Tree" ; select -> "ComboBox" ; onglets -> "TabBar" ; accordéon -> "Accordion" ; recherche -> "SearchBox" ; date -> "DateChooser" ; icône -> "Icon"/"IconLabel" ; paragraphe long -> "Paragraph" (pas "Label").
@@ -75,7 +76,7 @@ CAS PARTICULIERS À BIEN GÉRER :
 - Titre de section (gras, plus grand que le texte de formulaire, seul sur sa ligne) -> "SubTitle"/"Title", JAMAIS "Label".
 - "Link" seulement si le texte est visuellement coloré/souligné (cliquable). Un texte noir plein à côté d'un lien N'EST PAS un lien -- reste "Title"/"SubTitle".
 - Jamais fusionner 2 textes visuellement distincts (couleur/taille/police différente) en une seule valeur "text" avec un séparateur inventé ("|", "I"...) : ce sont 2 contrôles séparés.
-- Cercles numérotés d'étapes (ex "1 2 3" + "Saisie/Vérification/Transmission") : "RoundButton" (~32x32) pour chaque cercle + "Label" pour le texte dessous. JAMAIS "ProgressBar"/"Rectangle" pour ça (rendu disgracieux). Omets la ligne de connexion plutôt que de mal la représenter.
+- Cercles numérotés d'étapes (ex "1 2 3" + "Saisie/Vérification/Transmission") : "RoundButton" (~32x32) pour chaque cercle + "Label" pour le texte dessous, chacun un contrôle INDÉPENDANT. JAMAIS "ProgressBar"/"Rectangle"/"TabBar"/"ButtonBar" ni aucun conteneur qui engloberait plusieurs étapes dans un même cadre/pilule (rendu disgracieux, déjà observé). Omets la ligne de connexion plutôt que de mal la représenter.
 - Label juste AU-DESSUS de son TextInput (y_label + 15 ≈ y_input). Hiérarchie : titres > sous-titres > labels > champs. RadioButton côte à côte : même y, x différents.
 - Chaque TextInput/TextArea doit avoir un "h" explicite d'au moins 30px et un espacement vertical d'au moins 15-20px avant le label du champ suivant -- ne laisse jamais deux champs se toucher ou se chevaucher visuellement."""
 
