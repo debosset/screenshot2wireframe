@@ -46,7 +46,6 @@
     .big-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
     .big-btn:disabled{opacity:.4;cursor:not-allowed}
     .btn-analyze{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
-    .btn-generate{background:#1a237e;color:#fff}
     #progress{display:none;margin-top:14px}
     .pbar-wrap{height:5px;background:#eee;border-radius:3px;overflow:hidden}
     .pbar{height:100%;width:0%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:3px;transition:width .4s ease}
@@ -67,7 +66,6 @@
     .summary{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
     .sum-chip{background:#e8eaf6;color:#3949ab;border-radius:20px;padding:3px 10px;font-size:.76rem;font-weight:500}
     /* Generate */
-    #generate-card{display:none}
     .action-row{display:flex;gap:10px;margin-top:14px}
     .action-btn{flex:1;padding:12px;border:none;border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .2s,transform .1s;text-decoration:none}
     .action-btn:hover{transform:translateY(-1px)}
@@ -157,17 +155,11 @@
     </div>
     <div class="summary" id="summary"></div>
     <div class="components-list" id="components-list"></div>
-    <button id="generate-btn" class="big-btn btn-generate">⬇ Générer le fichier Balsamiq</button>
-  </div>
-
-  <!-- Étape 4 : Téléchargement -->
-  <div class="card" id="generate-card">
-    <div class="card-title"><span class="step-badge">4</span> Fichier prêt</div>
-    <div class="action-row">
+    <div class="action-row" id="action-row" style="display:none;margin-top:12px">
       <a id="dl-bmpr" class="action-btn btn-dl" href="#">📁 Télécharger .bmpr</a>
       <button id="copy-btn" class="action-btn btn-cp">📋 Copier JSON</button>
     </div>
-    <a id="dl-json" class="action-btn btn-cp" href="#" style="margin-top:8px;display:flex;font-size:.82rem">⬇ JSON debug</a>
+    <a id="dl-json" class="action-btn btn-cp" href="#" style="margin-top:8px;display:none;font-size:.82rem">⬇ JSON debug</a>
   </div>
 
   <footer>Fait avec <span class="heart">♥</span> par <a href="https://github.com/debosset" target="_blank">Adrien de Bosset</a></footer>
@@ -227,7 +219,7 @@
     // ── Upload ───────────────────────────────────────────────────────────────
     const dz=document.getElementById('dropzone'),fi=document.getElementById('file-input'),
     prev=document.getElementById('preview'),pw=document.getElementById('preview-wrap'),
-    analyzeBtn=document.getElementById('analyze-btn'),generateBtn=document.getElementById('generate-btn'),
+    analyzeBtn=document.getElementById('analyze-btn'),
     prog=document.getElementById('progress'),pbar=document.getElementById('pbar'),
     stat=document.getElementById('status'),err=document.getElementById('error'),
     clrBtn=document.getElementById('clear-btn'),copyBtn=document.getElementById('copy-btn'),
@@ -249,13 +241,11 @@
       file=f; prev.src=URL.createObjectURL(f); pw.style.display='block';
       analyzeBtn.disabled=false; err.style.display='none';
       document.getElementById('analysis-card').style.display='none';
-      document.getElementById('generate-card').style.display='none';
     }
 
     clrBtn.onclick=()=>{
       file=null; prev.src=''; pw.style.display='none'; analyzeBtn.disabled=true;
       document.getElementById('analysis-card').style.display='none';
-      document.getElementById('generate-card').style.display='none';
       err.style.display='none'; fi.value='';
     };
 
@@ -302,6 +292,7 @@
         await new Promise(r=>setTimeout(r,300));
         prog.style.display='none';
         renderAnalysis(d.components, d.components_count);
+        await runGenerate();
       }catch(e){
         clearInterval(t); prog.style.display='none';
         err.textContent=e.message; err.style.display='block';
@@ -323,14 +314,15 @@
           </div>
           <span class="comp-badge">${c.typeID}</span>
         </div>`).join('');
+      document.getElementById('action-row').style.display='none';
+      document.getElementById('dl-json').style.display='none';
       document.getElementById('analysis-card').style.display='block';
       document.getElementById('analysis-card').scrollIntoView({behavior:'smooth',block:'start'});
     }
 
-    // ── Générer ───────────────────────────────────────────────────────────────
-    generateBtn.onclick=async()=>{
+    // ── Générer (automatique, juste après l'analyse) ────────────────────────
+    async function runGenerate(){
       if(!jobId) return;
-      generateBtn.disabled=true; generateBtn.textContent='Génération…';
       try{
         const fd=new FormData();
         fd.append('job_id',jobId);
@@ -340,12 +332,12 @@
         if(!r.ok) throw new Error(d.detail||'Erreur');
         clipJson=d.clipboard_json;
         dlBmpr.href=d.bmpr_url; dlJson.href=d.download_url;
-        document.getElementById('generate-card').style.display='block';
-        document.getElementById('generate-card').scrollIntoView({behavior:'smooth',block:'start'});
+        document.getElementById('action-row').style.display='flex';
+        document.getElementById('dl-json').style.display='flex';
       }catch(e){
         err.textContent=e.message; err.style.display='block';
-      }finally{ generateBtn.disabled=false; generateBtn.textContent='⬇ Générer le fichier Balsamiq'; }
-    };
+      }
+    }
 
     // ── Copier JSON ───────────────────────────────────────────────────────────
     copyBtn.onclick=async()=>{
